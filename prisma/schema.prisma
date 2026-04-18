@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  name            String
+  phone           String
+  aadhar          String
+  address         String
+  gasType         GasType
+  gasVariant      GasVariant
+  deposit         Int      @default(0)
+  refund          Int      @default(0)
+  aadharImageUrl  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AuthUser {
+  id           String   @id @default(uuid())
+  username     String
+  role         UserRole
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([username, role], name: "username_role")
+}
+
+enum UserRole {
+  WORKER
+  ADMIN
+}
+
+enum GasType {
+  KONKAN
+  BHARATH_GAS
+  INDIAN_GAS
+}
+
+enum GasVariant {
+  KONKAN_17_KG
+  KONKAN_12_KG
+  KONKAN_5_5_KG
+  INDIAN_17_KG
+  INDIAN_12_KG
+  BHARATH_19_KG
+  BHARATH_5_KG
+}
