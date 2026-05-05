@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Customer {
@@ -20,6 +21,25 @@ model Customer {
   aadharImageUrl  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  
+  cancelledCylinders CancelledCylinder[]
+}
+
+model CancelledCylinder {
+  id              String   @id @default(uuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerName    String
+  customerPhone   String
+  customerAadhar  String
+  gasType         GasType
+  gasVariant      GasVariant
+  depositAmount   Int
+  refundAmount    Int
+  cancelledAt     DateTime @default(now())
+  reason          String?
+  
+  @@index([customerId])
 }
 
 model AuthUser {

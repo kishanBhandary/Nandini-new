@@ -19,6 +19,27 @@ type Customer = {
   createdAt: string;
 };
 
+type CancelledCylinder = {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  customerAadhar: string;
+  gasType: string;
+  gasVariant: string;
+  depositAmount: number;
+  refundAmount: number;
+  cancelledAt: string;
+  reason?: string;
+  customer?: {
+    id: string;
+    name: string;
+    phone: string;
+    aadhar: string;
+    address: string;
+  };
+};
+
 type AdminUser = {
   id: string;
   username: string;
@@ -30,6 +51,7 @@ type DashboardSection = 'all-users' | 'cancelled' | 'create-admin';
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [cancelledCylinders, setCancelledCylinders] = useState<CancelledCylinder[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<DashboardSection>('all-users');
@@ -42,6 +64,17 @@ export default function AdminDashboardPage() {
   const [adminsLoading, setAdminsLoading] = useState(false);
   const [adminsStatus, setAdminsStatus] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Read section from URL params on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const section = params.get('section');
+      if (section === 'cancelled' || section === 'create-admin' || section === 'all-users') {
+        setActiveSection(section as DashboardSection);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -75,7 +108,24 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     fetchCustomers();
+    fetchCancelledCylinders();
   }, []);
+
+  const fetchCancelledCylinders = async () => {
+    try {
+      const response = await fetch('/api/cancelled-cylinders');
+      const data = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(getApiError(data, 'Failed to fetch cancelled cylinders.'));
+      }
+      const loadedCancelledCylinders: CancelledCylinder[] = Array.isArray(data.cancelledCylinders)
+        ? (data.cancelledCylinders as CancelledCylinder[])
+        : [];
+      setCancelledCylinders(loadedCancelledCylinders);
+    } catch (error) {
+      console.error('Error fetching cancelled cylinders:', error);
+    }
+  };
 
   const fetchAdmins = async () => {
     setAdminsLoading(true);
@@ -128,15 +178,22 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const cancelledCustomerIds = useMemo(() => {
+    return new Set(cancelledCylinders.map((c) => c.customerId));
+  }, [cancelledCylinders]);
+
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLowerCase();
     const numericQuery = normalizedQuery.replace(/\D/g, '');
 
+    // Hide cancelled customers from the main list
+    const activeCustomers = customers.filter((customer) => !cancelledCustomerIds.has(customer.id));
+
     if (!normalizedQuery) {
-      return customers;
+      return activeCustomers;
     }
 
-    return customers.filter((customer) => {
+    return activeCustomers.filter((customer) => {
       const searchableText = [customer.name, customer.address, customer.gasType, customer.gasVariant]
         .join(' ')
         .toLowerCase();
@@ -150,11 +207,7 @@ export default function AdminDashboardPage() {
 
       return textMatch || directValueMatch || numericMatch;
     });
-  }, [customers, searchTerm]);
-
-  const cancelledCustomers = useMemo(() => {
-    return customers.filter((customer) => customer.refund > 0);
-  }, [customers]);
+  }, [customers, searchTerm, cancelledCustomerIds]);
 
   const showUsersSection = activeSection === 'all-users';
   const showCancelledSection = activeSection === 'cancelled';
@@ -259,8 +312,8 @@ export default function AdminDashboardPage() {
         </nav>
 
         <div className="menu-stats">
-          <p>Total users: {customers.length}</p>
-          <p>Cancelled cylinders: {cancelledCustomers.length}</p>
+          <p>Active users: {customers.filter(c => !cancelledCustomerIds.has(c.id)).length}</p>
+          <p>Cancelled cylinders: {cancelledCylinders.length}</p>
         </div>
 
         <button className="download-button" onClick={downloadCsv} disabled={loading || customers.length === 0}>
@@ -336,7 +389,7 @@ export default function AdminDashboardPage() {
             <header className="dashboard-header">
               <div className="dashboard-header-copy">
                 <h2>Cancelled Cylinders</h2>
-                <p>Users with refund amount are shown here as cancelled cylinder entries.</p>
+                <p>View all customers who have cancelled their cylinders.</p>
               </div>
               <Link href="/register" className="dashboard-register-link">
                 New Registration
@@ -350,24 +403,30 @@ export default function AdminDashboardPage() {
                     <th>Name</th>
                     <th>Phone</th>
                     <th>Gas Variant</th>
+                    <th>Deposit</th>
                     <th>Refund</th>
+                    <th>Cancelled Date</th>
+                    <th>Reason</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cancelledCustomers.length === 0 ? (
+                  {cancelledCylinders.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>No cancelled cylinder records found.</td>
+                      <td colSpan={8}>No cancelled cylinder records found.</td>
                     </tr>
                   ) : (
-                    cancelledCustomers.map((customer) => (
-                      <tr key={customer.id}>
-                        <td>{customer.name}</td>
-                        <td>{customer.phone}</td>
-                        <td>{customer.gasVariant}</td>
-                        <td>Rs. {customer.refund}</td>
+                    cancelledCylinders.map((cancelled) => (
+                      <tr key={cancelled.id}>
+                        <td>{cancelled.customerName}</td>
+                        <td>{cancelled.customerPhone}</td>
+                        <td>{cancelled.gasVariant}</td>
+                        <td>Rs. {cancelled.depositAmount}</td>
+                        <td>Rs. {cancelled.refundAmount}</td>
+                        <td>{new Date(cancelled.cancelledAt).toLocaleDateString()}</td>
+                        <td>{cancelled.reason || '-'}</td>
                         <td>
-                          <button type="button" className="view-profile-button" onClick={() => openCustomerProfile(customer.id)}>
+                          <button type="button" className="view-profile-button" onClick={() => openCustomerProfile(cancelled.customerId)}>
                             View Profile
                           </button>
                         </td>
