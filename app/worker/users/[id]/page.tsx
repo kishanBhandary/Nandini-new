@@ -1,15 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '../../../../lib/prisma';
-import ProfileActions from './profile-actions';
+import ProfileActions from '../../../admin/users/[id]/profile-actions';
 
-type AdminUserProfilePageProps = {
+type WorkerUserProfilePageProps = {
   params: {
     id: string;
   };
 };
 
-export default async function AdminUserProfilePage({ params }: AdminUserProfilePageProps) {
+export default async function WorkerUserProfilePage({ params }: WorkerUserProfilePageProps) {
   const customer = await prisma.customer.findUnique({
     where: { id: params.id },
     select: {
@@ -35,7 +35,7 @@ export default async function AdminUserProfilePage({ params }: AdminUserProfileP
     <main className="admin-profile-page-shell">
       <div className="admin-profile-page-card">
         <div className="admin-profile-utility-row">
-          <Link href="/admin" className="admin-profile-back-link">
+          <Link href="/worker" className="admin-profile-back-link">
             Back to Dashboard
           </Link>
         </div>
@@ -76,10 +76,6 @@ export default async function AdminUserProfilePage({ params }: AdminUserProfileP
           <div>
             <dt>Refund</dt>
             <dd>Rs. {customer.refund}</dd>
-          </div>
-          <div>
-            <dt>Cancelled Cylinder</dt>
-            <dd>{customer.refund > 0 ? 'Yes' : 'No'}</dd>
           </div>
           <div>
             <dt>Aadhar Image</dt>

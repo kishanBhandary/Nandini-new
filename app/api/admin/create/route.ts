@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     await prismaAuth.authUser.create({
       username,
       role: 'ADMIN',
-      passwordHash: hashPassword(password),
+      passwordHash: await hashPassword(password),
     });
 
     return NextResponse.json(

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { jsPDF } from 'jspdf';
 
 type CustomerProfileData = {
   id: string;
@@ -60,7 +59,8 @@ function fileNameForCustomer(name: string) {
   return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'customer'}-profile.pdf`;
 }
 
-function buildProfilePdf(customer: CustomerProfileData) {
+async function buildProfilePdf(customer: CustomerProfileData) {
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF();
   const left = 16;
   let y = 18;
@@ -110,8 +110,8 @@ export default function ProfileActions({ customer, className = '' }: ProfileActi
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const handleDownload = () => {
-    const doc = buildProfilePdf(customer);
+  const handleDownload = async () => {
+    const doc = await buildProfilePdf(customer);
     doc.save(fileNameForCustomer(customer.name));
     setMessage('Profile PDF downloaded.');
   };
@@ -160,7 +160,7 @@ export default function ProfileActions({ customer, className = '' }: ProfileActi
     setMessage(null);
 
     try {
-      const doc = buildProfilePdf(customer);
+      const doc = await buildProfilePdf(customer);
       const blob = doc.output('blob');
       const file = new File([blob], fileNameForCustomer(customer.name), { type: 'application/pdf' });
 
@@ -229,20 +229,7 @@ export default function ProfileActions({ customer, className = '' }: ProfileActi
           <MessageIcon />
           <span>{isBusy ? 'Preparing PDF...' : 'Send PDF to WhatsApp'}</span>
         </button>
-        <button type="button" className="profile-action-btn sms" onClick={handleSms}>
-          <MessageIcon />
-          <span>Send SMS Message</span>
-        </button>
-        {customer.refund > 0 ? (
-          <button 
-            type="button" 
-            className="profile-action-btn cancel already-cancelled" 
-            onClick={() => router.push('/admin?section=cancelled')}
-          >
-            <CancelIcon />
-            <span>Already Cancelled – View Cancelled Cylinders</span>
-          </button>
-        ) : (
+        {customer.refund <= 0 ? (
           <button 
             type="button" 
             className="profile-action-btn cancel" 
@@ -251,7 +238,7 @@ export default function ProfileActions({ customer, className = '' }: ProfileActi
             <CancelIcon />
             <span>Cancel Cylinder</span>
           </button>
-        )}
+        ) : null}
         {message ? <p className="profile-action-message">{message}</p> : null}
       </section>
 

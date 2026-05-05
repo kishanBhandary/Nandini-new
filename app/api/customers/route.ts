@@ -37,5 +37,7 @@ export async function GET(request: Request) {
     take: 100,
   });
 
-  return NextResponse.json({ customers });
+  const res = NextResponse.json({ customers });
+  res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=10');
+  return res;
 }

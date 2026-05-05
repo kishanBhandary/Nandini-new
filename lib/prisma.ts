@@ -8,3 +8,6 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+// Eagerly connect so the first query doesn't pay connection overhead
+void prisma.$connect();

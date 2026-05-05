@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ cancelledCylinders, message: 'Cancelled cylinders fetched successfully.' });
+    const res = NextResponse.json({ cancelledCylinders, message: 'Cancelled cylinders fetched successfully.' });
+    res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=10');
+    return res;
   } catch (error) {
     console.error('Fetch cancelled cylinders error:', error);
     return NextResponse.json({ error: 'Failed to fetch cancelled cylinders.' }, { status: 500 });

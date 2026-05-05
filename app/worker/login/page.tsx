@@ -85,6 +85,7 @@ export default function WorkerLoginScreenPage() {
   const canSubmit = useMemo(() => trimmedUsername.length > 0 && password.length > 0 && !loading, [trimmedUsername, password, loading]);
 
   useEffect(() => {
+    router.prefetch('/worker');
     const rememberedUsername = window.localStorage.getItem(REMEMBERED_WORKER_KEY);
     if (rememberedUsername) {
       setUsername(rememberedUsername);

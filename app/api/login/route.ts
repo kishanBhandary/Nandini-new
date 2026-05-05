@@ -17,7 +17,11 @@ const prismaAuth = prisma as unknown as {
   };
 };
 
+let defaultUsersCreated = false;
+
 async function ensureDefaultUsers() {
+  if (defaultUsersCreated) return;
+
   const defaultWorkerUsername = process.env.WORKER_USERNAME;
   const defaultWorkerPassword = process.env.WORKER_PASSWORD;
   const defaultAdminUsername = process.env.ADMIN_USERNAME;
@@ -28,35 +32,25 @@ async function ensureDefaultUsers() {
     return;
   }
 
-  await prismaAuth.authUser.upsert({
-    where: {
-      username_role: {
-        username: defaultWorkerUsername,
-        role: 'WORKER',
-      },
-    },
-    update: {},
-    create: {
-      username: defaultWorkerUsername,
-      role: 'WORKER',
-      passwordHash: hashPassword(defaultWorkerPassword),
-    },
-  });
+  const [workerHash, adminHash] = await Promise.all([
+    hashPassword(defaultWorkerPassword),
+    hashPassword(defaultAdminPassword),
+  ]);
 
-  await prismaAuth.authUser.upsert({
-    where: {
-      username_role: {
-        username: defaultAdminUsername,
-        role: 'ADMIN',
-      },
-    },
-    update: {},
-    create: {
-      username: defaultAdminUsername,
-      role: 'ADMIN',
-      passwordHash: hashPassword(defaultAdminPassword),
-    },
-  });
+  await Promise.all([
+    prismaAuth.authUser.upsert({
+      where: { username_role: { username: defaultWorkerUsername, role: 'WORKER' } },
+      update: {},
+      create: { username: defaultWorkerUsername, role: 'WORKER', passwordHash: workerHash },
+    }),
+    prismaAuth.authUser.upsert({
+      where: { username_role: { username: defaultAdminUsername, role: 'ADMIN' } },
+      update: {},
+      create: { username: defaultAdminUsername, role: 'ADMIN', passwordHash: adminHash },
+    }),
+  ]);
+
+  defaultUsersCreated = true;
 }
 
 export async function POST(request: Request) {
