@@ -50,6 +50,16 @@ export default function WorkerDashboardPage() {
   const [cancelRefund, setCancelRefund] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState('');
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler as EventListener);
+    return () => window.removeEventListener('beforeinstallprompt', handler as EventListener);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -123,6 +133,15 @@ export default function WorkerDashboardPage() {
 
   const openCustomerProfile = (customerId: string) => {
     router.push(`/worker/users/${customerId}`);
+  };
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const result = await deferredPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
   };
 
   const openCancelModal = (customer: Customer) => {
@@ -227,6 +246,20 @@ export default function WorkerDashboardPage() {
             Cancelled Cylinders
           </button>
         </nav>
+
+        {deferredPrompt ? (
+          <button
+            type="button"
+            className={s.navItem}
+            onClick={() => { handleInstall(); setIsMobileMenuOpen(false); }}
+            style={{ marginTop: '0.5rem', color: '#2563EB', fontWeight: 600 }}
+          >
+            <svg className={s.navIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Install App
+          </button>
+        ) : null}
 
         <div className={s.statsCard}>
           <div className={s.statsRow}>
