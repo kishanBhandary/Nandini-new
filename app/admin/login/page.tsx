@@ -130,11 +130,10 @@ export default function AdminLoginScreenPage() {
         window.localStorage.removeItem(REMEMBERED_ADMIN_KEY);
       }
 
-      router.push('/admin');
+      window.location.href = '/admin';
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Login failed.');
       setFailedAttempts((prev) => prev + 1);
-    } finally {
       setLoading(false);
     }
   };

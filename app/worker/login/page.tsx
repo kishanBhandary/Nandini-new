@@ -130,11 +130,10 @@ export default function WorkerLoginScreenPage() {
         window.localStorage.removeItem(REMEMBERED_WORKER_KEY);
       }
 
-      router.push('/worker');
+      window.location.href = '/worker';
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Login failed.');
       setFailedAttempts((prev) => prev + 1);
-    } finally {
       setLoading(false);
     }
   };
