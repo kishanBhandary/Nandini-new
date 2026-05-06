@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { aadharBucketName, supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { aadharBucketName, getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 
 async function ensureBucketExists() {
+  const supabaseAdmin = getSupabaseAdmin();
   if (!supabaseAdmin) {
     throw new Error('Supabase storage is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   }
@@ -27,6 +28,7 @@ async function ensureBucketExists() {
 
 export async function POST(request: Request) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     if (!supabaseAdmin) {
       return NextResponse.json(
         { error: 'Supabase storage is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' },
