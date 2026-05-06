@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import { hashPassword } from '../../../../lib/auth';
 
@@ -10,14 +10,22 @@ const prismaAuth = prisma as unknown as {
       where: { username_role: { username: string; role: UserRole } };
     }) => Promise<{ role: UserRole; passwordHash: string } | null>;
     create: (args: {
-      username: string;
-      role: UserRole;
-      passwordHash: string;
+      data: { username: string; role: UserRole; passwordHash: string };
+    }) => Promise<unknown>;
+  };
+  auditLog: {
+    create: (args: {
+      data: {
+        username: string;
+        role: string;
+        action: string;
+        target?: string;
+      };
     }) => Promise<unknown>;
   };
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const username = typeof body?.username === 'string' ? body.username.trim() : '';
@@ -47,9 +55,18 @@ export async function POST(request: Request) {
     }
 
     await prismaAuth.authUser.create({
-      username,
-      role: 'WORKER',
-      passwordHash: await hashPassword(password),
+      data: { username, role: 'WORKER', passwordHash: await hashPassword(password) },
+    });
+
+    // Audit log
+    const adminUsername = request.cookies.get('session_username')?.value || 'unknown';
+    await prismaAuth.auditLog.create({
+      data: {
+        username: adminUsername,
+        role: 'ADMIN',
+        action: 'CREATE_WORKER',
+        target: username,
+      },
     });
 
     return NextResponse.json(

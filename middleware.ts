@@ -9,7 +9,8 @@ export function middleware(request: NextRequest) {
   }
 
   const sessionRole = request.cookies.get('session_role')?.value;
-  const isLoggedIn = sessionRole === 'ADMIN' || sessionRole === 'WORKER';
+  const sessionId = request.cookies.get('session_id')?.value;
+  const isLoggedIn = (sessionRole === 'ADMIN' || sessionRole === 'WORKER') && !!sessionId;
 
   // Allow any logged-in user to view user profiles
   if ((pathname.startsWith('/admin/users/') || pathname.startsWith('/worker/users/')) && isLoggedIn) {

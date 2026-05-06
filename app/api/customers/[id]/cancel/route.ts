@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 
+const db = prisma as unknown as {
+  auditLog: {
+    create: (args: {
+      data: {
+        username: string;
+        role: string;
+        action: string;
+        target?: string;
+        details?: string;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
 type RouteContext = {
   params: {
     id: string;
@@ -60,6 +74,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
       });
 
       return { cancelledCylinder, updatedCustomer };
+    });
+
+    // Audit log
+    const username = request.cookies.get('session_username')?.value || 'unknown';
+    const role = request.cookies.get('session_role')?.value || 'ADMIN';
+    await db.auditLog.create({
+      data: {
+        username,
+        role,
+        action: 'CANCEL_CYLINDER',
+        target: customer.name,
+        details: JSON.stringify({ customerId: id, refundAmount, reason }),
+      },
     });
 
     return NextResponse.json(

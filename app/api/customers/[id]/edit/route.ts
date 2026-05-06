@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 
+const db = prisma as unknown as {
+  auditLog: {
+    create: (args: {
+      data: {
+        username: string;
+        role: string;
+        action: string;
+        target?: string;
+        details?: string;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
 type RouteContext = {
   params: {
     id: string;
@@ -81,6 +95,19 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       });
 
       return updated;
+    });
+
+    // Audit log
+    const username = request.cookies.get('session_username')?.value || performedBy || 'unknown';
+    const role = request.cookies.get('session_role')?.value || 'ADMIN';
+    await db.auditLog.create({
+      data: {
+        username,
+        role,
+        action: 'EDIT_CUSTOMER',
+        target: customer.name,
+        details: JSON.stringify(changes),
+      },
     });
 
     return NextResponse.json({ success: true, customer: result });

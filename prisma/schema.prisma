@@ -56,14 +56,50 @@ model ActivityLog {
 }
 
 model AuthUser {
-  id           String   @id @default(uuid())
+  id           String       @id @default(uuid())
   username     String
   role         UserRole
   passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  permissions  String[]     @default([])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  sessions     Session[]
+  auditLogs    AuditLog[]
 
   @@unique([username, role], name: "username_role")
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  user        AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        UserRole
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  active      Boolean  @default(true)
+
+  @@index([userId])
+  @@index([active])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        AuthUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username    String
+  role        String
+  action      String   // LOGIN, LOGOUT, CREATE_CUSTOMER, EDIT_CUSTOMER, CANCEL_CYLINDER, CREATE_ADMIN, CREATE_WORKER, FORCE_LOGOUT, PERMISSION_CHANGE
+  target      String?  // target entity id or description
+  details     String?  // JSON string with extra info
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 enum UserRole {

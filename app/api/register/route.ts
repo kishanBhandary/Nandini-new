@@ -1,7 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
 
-export async function POST(request: Request) {
+const db = prisma as unknown as {
+  auditLog: {
+    create: (args: {
+      data: {
+        username: string;
+        role: string;
+        action: string;
+        target?: string;
+        details?: string;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { name, phone, aadhar, address, gasType, gasVariant, deposit, refund, aadharImageUrl } = body;
@@ -30,6 +44,21 @@ export async function POST(request: Request) {
         aadharImageUrl: aadharImageUrl ?? null,
       },
     });
+
+    // Audit log
+    const username = request.cookies.get('session_username')?.value || 'unknown';
+    const role = request.cookies.get('session_role')?.value || 'WORKER';
+    try {
+      await db.auditLog.create({
+        data: {
+          username,
+          role,
+          action: 'CREATE_CUSTOMER',
+          target: name,
+          details: JSON.stringify({ customerId: customer.id, phone, aadhar }),
+        },
+      });
+    } catch { /* don't fail registration if audit fails */ }
 
     return NextResponse.json({ success: true, customer });
   } catch (error) {

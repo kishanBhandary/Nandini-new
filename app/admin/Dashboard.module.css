@@ -83,7 +83,7 @@
 
 .brand {
   margin: 0 0 0.25rem;
-  padding: 0 0.5rem;
+  padding: 0;
   font-size: 1.25rem;
   font-weight: 700;
   color: #111111;
@@ -91,8 +91,8 @@
 }
 
 .brandSub {
-  margin: 0 0 1.5rem;
-  padding: 0 0.5rem;
+  margin: 0;
+  padding: 0;
   font-size: 0.8rem;
   color: #6B7280;
   font-weight: 500;
@@ -990,46 +990,91 @@
   background: #000000;
 }
 
-/* ── Dark Mode Toggle ───────────────────────────────── */
-.darkToggleBtn {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #374151;
-  transition: all 0.2s ease;
-}
-
-.darkToggleBtn:hover {
-  background: #F3F4F6;
-}
-
-.darkToggleSidebar {
+/* ── Dark Mode Pill Toggle ───────────────────────────── */
+.brandRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
-  background: #F9FAFB;
-  color: #374151;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
 }
 
-.darkToggleSidebar:hover {
-  background: #F3F4F6;
-  border-color: #D1D5DB;
+.brandRow .brand {
+  margin: 0;
+  padding: 0;
+}
+
+.brandRow .brandSub {
+  margin: 0.15rem 0 0;
+  padding: 0;
+}
+
+.darkTogglePill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 56px;
+  height: 28px;
+  padding: 3px;
+  border: none;
+  border-radius: 999px;
+  background: #1F2937;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  flex-shrink: 0;
+}
+
+.darkTogglePillActive {
+  background: #E5E7EB;
+}
+
+.darkToggleIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+  color: #9CA3AF;
+  transition: color 0.3s ease;
+}
+
+/* Light mode: sun is dim, moon is bright */
+.darkTogglePill .darkToggleIcon:first-child {
+  color: #6B7280;
+}
+
+.darkTogglePill .darkToggleIcon:last-of-type {
+  color: #F9FAFB;
+}
+
+/* Dark mode active: sun is bright, moon is dim */
+.darkTogglePillActive .darkToggleIcon:first-child {
+  color: #111827;
+}
+
+.darkTogglePillActive .darkToggleIcon:last-of-type {
+  color: #9CA3AF;
+}
+
+.darkToggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.darkTogglePillActive .darkToggleThumb {
+  transform: translateX(28px);
+  background: #374151;
 }
 
 /* ── Duplicate Group ────────────────────────────────── */
@@ -1044,12 +1089,8 @@
   margin: 0.5rem 0;
 }
 
-/* ── Mobile: show dark mode btn in header ───────────── */
+/* ── Mobile: responsive fixes ───────────────────────── */
 @media (max-width: 768px) {
-  .darkToggleBtn {
-    display: flex;
-  }
-
   .aadharModalCard,
   .editModalCard {
     max-width: 95vw;
@@ -1075,12 +1116,12 @@
 /* ── DARK MODE ────────────────────────────────────── */
 /* ══════════════════════════════════════════════════════ */
 .dark {
-  background: #111827;
+  background: #000000;
 }
 
 .dark .sidebar {
-  background: #1F2937;
-  border-right-color: #374151;
+  background: #0A0A0A;
+  border-right-color: #1A1A1A;
 }
 
 .dark .brand {
@@ -1096,19 +1137,19 @@
 }
 
 .dark .navItem:hover {
-  background: #374151;
+  background: #1A1A1A;
   color: #F9FAFB;
 }
 
 .dark .navItemActive {
-  background: #374151;
+  background: #1A1A1A;
   color: #F9FAFB;
   border-left-color: #F9FAFB;
 }
 
 .dark .statsCard {
-  background: #374151;
-  border-color: #4B5563;
+  background: #1A1A1A;
+  border-color: #262626;
 }
 
 .dark .statsLabel {
@@ -1120,18 +1161,18 @@
 }
 
 .dark .downloadBtn {
-  background: #374151;
+  background: #1A1A1A;
   color: #D1D5DB;
-  border-color: #4B5563;
+  border-color: #262626;
 }
 
 .dark .downloadBtn:hover:not(:disabled) {
-  background: #4B5563;
-  border-color: #6B7280;
+  background: #262626;
+  border-color: #404040;
 }
 
 .dark .main {
-  background: #111827;
+  background: #000000;
 }
 
 .dark .headerTitle {
@@ -1143,8 +1184,8 @@
 }
 
 .dark .searchInput {
-  background: #1F2937;
-  border-color: #374151;
+  background: #0A0A0A;
+  border-color: #1A1A1A;
   color: #F9FAFB;
 }
 
@@ -1154,23 +1195,23 @@
 }
 
 .dark .tableCard {
-  background: #1F2937;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  background: #0A0A0A;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .dark .table th {
-  background: #374151;
+  background: #1A1A1A;
   color: #9CA3AF;
-  border-bottom-color: #4B5563;
+  border-bottom-color: #262626;
 }
 
 .dark .table td {
   color: #D1D5DB;
-  border-bottom-color: #374151;
+  border-bottom-color: #1A1A1A;
 }
 
 .dark .table tbody tr:hover {
-  background: #374151;
+  background: #1A1A1A;
 }
 
 .dark .emptyCell {
@@ -1178,12 +1219,12 @@
 }
 
 .dark .statCard {
-  background: #1F2937;
-  border-color: #374151;
+  background: #0A0A0A;
+  border-color: #1A1A1A;
 }
 
 .dark .statCard:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 .dark .statLabel {
@@ -1196,8 +1237,8 @@
 
 .dark .chartCard,
 .dark .chartCardFull {
-  background: #1F2937;
-  border-color: #374151;
+  background: #0A0A0A;
+  border-color: #1A1A1A;
 }
 
 .dark .chartTitle {
@@ -1209,8 +1250,8 @@
 }
 
 .dark .createCard {
-  background: #1F2937;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  background: #0A0A0A;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .dark .createTitle {
@@ -1226,14 +1267,14 @@
 }
 
 .dark .formInput {
-  background: #374151;
-  border-color: #4B5563;
+  background: #1A1A1A;
+  border-color: #262626;
   color: #F9FAFB;
 }
 
 .dark .formInput:focus {
   border-color: #3B82F6;
-  background: #1F2937;
+  background: #0A0A0A;
 }
 
 .dark .adminListTitle {
@@ -1251,7 +1292,7 @@
 }
 
 .dark .message {
-  background: #374151;
+  background: #1A1A1A;
   color: #D1D5DB;
 }
 
@@ -1270,7 +1311,7 @@
 .dark .modalCard,
 .dark .aadharModalCard,
 .dark .editModalCard {
-  background: #1F2937;
+  background: #0A0A0A;
 }
 
 .dark .modalTitle {
@@ -1286,86 +1327,76 @@
 }
 
 .dark .modalInput {
-  background: #374151;
-  border-color: #4B5563;
+  background: #1A1A1A;
+  border-color: #262626;
   color: #F9FAFB;
 }
 
 .dark .modalInput:focus {
   border-color: #3B82F6;
-  background: #1F2937;
+  background: #0A0A0A;
 }
 
 .dark .modalCancelBtn {
-  background: #374151;
+  background: #1A1A1A;
   color: #D1D5DB;
-  border-color: #4B5563;
+  border-color: #262626;
 }
 
 .dark .modalCancelBtn:hover {
-  background: #4B5563;
+  background: #262626;
 }
 
 .dark .pageBtn {
-  background: #1F2937;
+  background: #0A0A0A;
   color: #D1D5DB;
-  border-color: #374151;
+  border-color: #1A1A1A;
 }
 
 .dark .pageBtn:hover:not(:disabled) {
-  background: #374151;
+  background: #1A1A1A;
 }
 
 .dark .pageBtnActive {
   background: #F9FAFB;
-  color: #111827;
+  color: #000000;
   border-color: #F9FAFB;
 }
 
 .dark .dateRangeBtn {
-  background: #1F2937;
+  background: #0A0A0A;
   color: #9CA3AF;
-  border-color: #374151;
+  border-color: #1A1A1A;
 }
 
 .dark .dateRangeBtn:hover {
-  background: #374151;
+  background: #1A1A1A;
   color: #D1D5DB;
 }
 
 .dark .dateRangeBtnActive {
   background: #F9FAFB;
-  color: #111827;
+  color: #000000;
   border-color: #F9FAFB;
 }
 
 .dark .newRegBtn {
   background: #F9FAFB;
-  color: #111827;
+  color: #000000;
 }
 
 .dark .newRegBtn:hover {
   background: #ffffff;
 }
 
-.dark .darkToggleSidebar {
-  background: #374151;
-  color: #D1D5DB;
-  border-color: #4B5563;
-}
-
-.dark .darkToggleSidebar:hover {
-  background: #4B5563;
-}
-
 .dark .imgPreviewBtn {
-  background: #374151;
-  border-color: #4B5563;
+  background: #1A1A1A;
+  border-color: #262626;
   color: #D1D5DB;
 }
 
 .dark .imgPreviewBtn:hover {
-  background: #4B5563;
+  background: #262626;
   color: #F9FAFB;
 }
 
@@ -1374,8 +1405,8 @@
 }
 
 .dark .mobileHeader {
-  background: #1F2937;
-  border-bottom-color: #374151;
+  background: #0A0A0A;
+  border-bottom-color: #1A1A1A;
 }
 
 .dark .mobileHeaderTitle {
@@ -1387,14 +1418,6 @@
 }
 
 .dark .mobileToggle:hover {
-  background: #374151;
+  background: #1A1A1A;
   color: #F9FAFB;
-}
-
-.dark .darkToggleBtn {
-  color: #D1D5DB;
-}
-
-.dark .darkToggleBtn:hover {
-  background: #374151;
 }

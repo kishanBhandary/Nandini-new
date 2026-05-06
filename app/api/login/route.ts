@@ -13,7 +13,29 @@ const prismaAuth = prisma as unknown as {
     }) => Promise<unknown>;
     findUnique: (args: {
       where: { username_role: { username: string; role: UserRole } };
-    }) => Promise<{ role: UserRole; passwordHash: string } | null>;
+    }) => Promise<{ id: string; role: UserRole; passwordHash: string; permissions: string[] } | null>;
+  };
+  session: {
+    create: (args: {
+      data: {
+        userId: string;
+        role: UserRole;
+        ipAddress?: string;
+        userAgent?: string;
+        expiresAt: Date;
+      };
+    }) => Promise<{ id: string }>;
+  };
+  auditLog: {
+    create: (args: {
+      data: {
+        userId: string;
+        username: string;
+        role: string;
+        action: string;
+        ipAddress?: string;
+      };
+    }) => Promise<unknown>;
   };
 };
 
@@ -79,14 +101,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
     }
 
-    const response = NextResponse.json({ success: true, role: user.role });
-    response.cookies.set('session_role', user.role, {
+    // Get IP & user agent
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || undefined;
+    const userAgent = request.headers.get('user-agent') || undefined;
+
+    // Create session
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+    const session = await prismaAuth.session.create({
+      data: {
+        userId: user.id,
+        role: user.role,
+        ipAddress,
+        userAgent,
+        expiresAt,
+      },
+    });
+
+    // Log audit event
+    await prismaAuth.auditLog.create({
+      data: {
+        userId: user.id,
+        username,
+        role: user.role,
+        action: 'LOGIN',
+        ipAddress,
+      },
+    });
+
+    const response = NextResponse.json({ success: true, role: user.role, permissions: user.permissions || [] });
+
+    const cookieOpts = {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 60 * 60 * 8,
-    });
+    };
+
+    response.cookies.set('session_role', user.role, cookieOpts);
+    response.cookies.set('session_id', session.id, cookieOpts);
+    response.cookies.set('session_username', username, cookieOpts);
+    response.cookies.set('session_permissions', JSON.stringify(user.permissions || []), cookieOpts);
 
     return response;
   } catch (error) {
