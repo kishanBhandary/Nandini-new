@@ -91,7 +91,7 @@ export default function WorkerLoginScreenPage() {
       setUsername(rememberedUsername);
       setRememberUsername(true);
     }
-  }, []);
+  }, [router]);
 
   const updateCapsLockState = (event: KeyboardEvent<HTMLInputElement>) => {
     setCapsLockEnabled(event.getModifierState('CapsLock'));

@@ -165,7 +165,7 @@ export default function AdminDashboardPage() {
     if (activeSection === 'create-admin' && admins.length === 0 && !adminsLoading) {
       fetchAdmins();
     }
-  }, [activeSection]);
+  }, [activeSection, admins.length, adminsLoading]);
 
   const createAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
