@@ -4,6 +4,11 @@ import Link from 'next/link';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { getApiError, parseApiPayload } from '../../lib/apiResponse';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+  AreaChart, Area,
+} from 'recharts';
 import s from './Dashboard.module.css';
 
 type Customer = {
@@ -47,7 +52,7 @@ type AdminUser = {
   createdAt: string;
 };
 
-type DashboardSection = 'all-users' | 'cancelled' | 'create-admin';
+type DashboardSection = 'dashboard' | 'all-users' | 'cancelled' | 'create-admin' | 'create-worker';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -71,13 +76,20 @@ export default function AdminDashboardPage() {
   const [cancelRefund, setCancelRefund] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState('');
+  const [newWorkerUsername, setNewWorkerUsername] = useState('');
+  const [newWorkerPassword, setNewWorkerPassword] = useState('');
+  const [creatingWorker, setCreatingWorker] = useState(false);
+  const [workerMessage, setWorkerMessage] = useState<string | null>(null);
+  const [workers, setWorkers] = useState<AdminUser[]>([]);
+  const [workersLoading, setWorkersLoading] = useState(false);
+  const [workersStatus, setWorkersStatus] = useState<string | null>(null);
 
   // Read section from URL params on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const section = params.get('section');
-      if (section === 'cancelled' || section === 'create-admin' || section === 'all-users') {
+      if (section === 'dashboard' || section === 'cancelled' || section === 'create-admin' || section === 'create-worker' || section === 'all-users') {
         setActiveSection(section as DashboardSection);
       }
     }
@@ -167,6 +179,59 @@ export default function AdminDashboardPage() {
     }
   }, [activeSection, admins.length, adminsLoading]);
 
+  const fetchWorkers = async () => {
+    setWorkersLoading(true);
+    setWorkersStatus(null);
+    try {
+      const response = await fetch('/api/worker/list');
+      const data = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(getApiError(data, 'Failed to fetch workers.'));
+      }
+      const loadedWorkers: AdminUser[] = Array.isArray(data.workers) ? (data.workers as AdminUser[]) : [];
+      setWorkers(loadedWorkers);
+    } catch (error) {
+      setWorkersStatus(error instanceof Error ? error.message : 'Unable to load workers.');
+    } finally {
+      setWorkersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === 'create-worker' && workers.length === 0 && !workersLoading) {
+      fetchWorkers();
+    }
+  }, [activeSection, workers.length, workersLoading]);
+
+  const createWorker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWorkerMessage(null);
+    setCreatingWorker(true);
+
+    try {
+      const response = await fetch('/api/worker/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newWorkerUsername, password: newWorkerPassword }),
+      });
+
+      const data = await parseApiPayload(response);
+
+      if (!response.ok) {
+        throw new Error(getApiError(data, 'Failed to create worker.'));
+      }
+
+      setWorkerMessage(`Success: ${typeof data.message === 'string' ? data.message : 'Worker created.'}`);
+      setNewWorkerUsername('');
+      setNewWorkerPassword('');
+      await fetchWorkers();
+    } catch (error) {
+      setWorkerMessage(`Error: ${error instanceof Error ? error.message : 'Unable to create worker.'}`);
+    } finally {
+      setCreatingWorker(false);
+    }
+  };
+
   const createAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminMessage(null);
@@ -244,9 +309,60 @@ export default function AdminDashboardPage() {
     });
   }, [cancelledCylinders, cancelledSearchTerm]);
 
+  const showDashboardSection = activeSection === 'dashboard';
   const showUsersSection = activeSection === 'all-users';
   const showCancelledSection = activeSection === 'cancelled';
   const showCreateAdminSection = activeSection === 'create-admin';
+  const showCreateWorkerSection = activeSection === 'create-worker';
+
+  // ── Analytics data ──
+  const activeUsers = useMemo(() => customers.filter(c => !cancelledCustomerIds.has(c.id)), [customers, cancelledCustomerIds]);
+
+  const gasTypeData = useMemo(() => {
+    const map: Record<string, number> = {};
+    activeUsers.forEach(c => {
+      const label = c.gasType.replace(/_/g, ' ');
+      map[label] = (map[label] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, count]) => ({ name, count }));
+  }, [activeUsers]);
+
+  const gasVariantData = useMemo(() => {
+    const map: Record<string, number> = {};
+    activeUsers.forEach(c => {
+      const label = c.gasVariant.replace(/_/g, ' ');
+      map[label] = (map[label] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, value]) => ({ name, value }));
+  }, [activeUsers]);
+
+  const monthlyData = useMemo(() => {
+    const map: Record<string, { registrations: number; cancellations: number }> = {};
+    customers.forEach(c => {
+      const d = new Date(c.createdAt);
+      const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
+      if (!map[key]) map[key] = { registrations: 0, cancellations: 0 };
+      map[key].registrations++;
+    });
+    cancelledCylinders.forEach(c => {
+      const d = new Date(c.cancelledAt);
+      const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
+      if (!map[key]) map[key] = { registrations: 0, cancellations: 0 };
+      map[key].cancellations++;
+    });
+    return Object.entries(map)
+      .sort((a, b) => {
+        const parse = (s: string) => { const [m, y] = s.split(' '); return new Date(`${m} 1, ${y}`).getTime(); };
+        return parse(a[0]) - parse(b[0]);
+      })
+      .map(([month, data]) => ({ month, ...data }));
+  }, [customers, cancelledCylinders]);
+
+  const totalDeposits = useMemo(() => activeUsers.reduce((sum, c) => sum + c.deposit, 0), [activeUsers]);
+  const totalRefunds = useMemo(() => cancelledCylinders.reduce((sum, c) => sum + c.refundAmount, 0), [cancelledCylinders]);
+
+  const PIE_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6'];
+  const BAR_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6'];
 
   const openCustomerProfile = (customerId: string) => {
     router.push(`/admin/users/${customerId}`);
@@ -383,6 +499,16 @@ export default function AdminDashboardPage() {
           </button>
           <button
             type="button"
+            className={`${s.navItem} ${showDashboardSection ? s.navItemActive : ''}`}
+            onClick={() => { setActiveSection('dashboard'); setIsMobileMenuOpen(false); }}
+          >
+            <svg className={s.navIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+            </svg>
+            Dashboard
+          </button>
+          <button
+            type="button"
             className={`${s.navItem} ${showCancelledSection ? s.navItemActive : ''}`}
             onClick={() => { setActiveSection('cancelled'); setIsMobileMenuOpen(false); }}
           >
@@ -400,6 +526,16 @@ export default function AdminDashboardPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
             Create Admin
+          </button>
+          <button
+            type="button"
+            className={`${s.navItem} ${showCreateWorkerSection ? s.navItemActive : ''}`}
+            onClick={() => { setActiveSection('create-worker'); setIsMobileMenuOpen(false); }}
+          >
+            <svg className={s.navIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+            </svg>
+            Create Worker
           </button>
         </nav>
 
@@ -423,6 +559,142 @@ export default function AdminDashboardPage() {
       <main className={s.main}>
         {status ? <div className={s.statusError}>{status}</div> : null}
         {loading ? <p className={s.loadingText}>Loading customer data...</p> : null}
+
+        {/* ── Dashboard Analytics ──────────────────── */}
+        {!loading && showDashboardSection ? (
+          <>
+            <header className={s.header}>
+              <div className={s.headerCopy}>
+                <h2 className={s.headerTitle}>Dashboard Overview</h2>
+                <p className={s.headerSub}>Business analytics and key metrics at a glance</p>
+              </div>
+            </header>
+
+            {/* Stat Cards */}
+            <div className={s.analyticsGrid}>
+              <div className={s.statCard}>
+                <span className={s.statLabel}>Total Registrations</span>
+                <span className={s.statNumber}>{customers.length}</span>
+              </div>
+              <div className={s.statCard}>
+                <span className={s.statLabel}>Active Users</span>
+                <span className={s.statNumber}>{activeUsers.length}</span>
+              </div>
+              <div className={s.statCard}>
+                <span className={s.statLabel}>Cancelled Cylinders</span>
+                <span className={s.statNumber}>{cancelledCylinders.length}</span>
+              </div>
+              <div className={s.statCard}>
+                <span className={s.statLabel}>Total Deposits</span>
+                <span className={s.statNumber}>₹{totalDeposits.toLocaleString()}</span>
+              </div>
+              <div className={s.statCard}>
+                <span className={s.statLabel}>Total Refunds</span>
+                <span className={s.statNumber}>₹{totalRefunds.toLocaleString()}</span>
+              </div>
+              <div className={s.statCard}>
+                <span className={s.statLabel}>Net Revenue</span>
+                <span className={s.statNumber}>₹{(totalDeposits - totalRefunds).toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Charts Row */}
+            <div className={s.chartsRow}>
+              {/* Gas Type Distribution */}
+              <div className={s.chartCard}>
+                <h3 className={s.chartTitle}>Cylinder Types</h3>
+                <p className={s.chartSub}>Distribution by gas type</p>
+                <div className={s.chartWrap}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={gasTypeData} barSize={40}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B7280' }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {gasTypeData.map((_, i) => (
+                          <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Gas Variant Pie */}
+              <div className={s.chartCard}>
+                <h3 className={s.chartTitle}>Cylinder Variants</h3>
+                <p className={s.chartSub}>Breakdown by variant size</p>
+                <div className={s.chartWrap}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={gasVariantData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={95}
+                        innerRadius={50}
+                        paddingAngle={3}
+                        label={({ name, percent }) => `${(name ?? '').split(' ').slice(0, 2).join(' ')} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                        labelLine={false}
+                        style={{ fontSize: 11 }}
+                      >
+                        {gasVariantData.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                      />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 12 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Trends */}
+            {monthlyData.length > 0 && (
+              <div className={s.chartCardFull}>
+                <h3 className={s.chartTitle}>Monthly Trends</h3>
+                <p className={s.chartSub}>Registrations vs cancellations over time</p>
+                <div className={s.chartWrap}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={monthlyData}>
+                      <defs>
+                        <linearGradient id="regGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="cancelGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6B7280' }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                      />
+                      <Area type="monotone" dataKey="registrations" stroke="#3B82F6" strokeWidth={2.5} fill="url(#regGrad)" />
+                      <Area type="monotone" dataKey="cancellations" stroke="#EF4444" strokeWidth={2.5} fill="url(#cancelGrad)" />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </>
+        ) : null}
 
         {/* ── All Users ────────────────────────────── */}
         {!loading && showUsersSection ? (
@@ -631,6 +903,84 @@ export default function AdminDashboardPage() {
                               <tr key={admin.id}>
                                 <td>{admin.username}</td>
                                 <td>{new Date(admin.createdAt).toLocaleString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ── Create Worker ────────────────────────── */}
+        {!loading && showCreateWorkerSection ? (
+          <div className={s.createSection}>
+            <div className={s.createCard}>
+              <h2 className={s.createTitle}>Add New Worker</h2>
+              <p className={s.createSub}>Create a worker login for limited dashboard access.</p>
+              <form onSubmit={createWorker} className={s.form}>
+                <div className={s.formGroup}>
+                  <label htmlFor="worker-username" className={s.formLabel}>Worker Username</label>
+                  <input
+                    id="worker-username"
+                    type="text"
+                    className={s.formInput}
+                    value={newWorkerUsername}
+                    onChange={(e) => setNewWorkerUsername(e.target.value)}
+                    placeholder="Enter username"
+                    required
+                    disabled={creatingWorker}
+                  />
+                </div>
+                <div className={s.formGroup}>
+                  <label htmlFor="worker-password" className={s.formLabel}>Worker Password</label>
+                  <input
+                    id="worker-password"
+                    type="password"
+                    className={s.formInput}
+                    value={newWorkerPassword}
+                    onChange={(e) => setNewWorkerPassword(e.target.value)}
+                    placeholder="Enter password"
+                    required
+                    disabled={creatingWorker}
+                  />
+                </div>
+                <button type="submit" className={s.createBtn} disabled={creatingWorker}>
+                  {creatingWorker ? 'Creating...' : 'Create Worker'}
+                </button>
+              </form>
+              {workerMessage ? (
+                <div className={`${s.message} ${workerMessage.startsWith('Success:') ? s.messageSuccess : s.messageError}`}>
+                  {workerMessage}
+                </div>
+              ) : null}
+
+              <div className={s.adminList}>
+                <h3 className={s.adminListTitle}>Existing Workers</h3>
+                {workersStatus ? <p className={s.adminListError}>{workersStatus}</p> : null}
+                {workersLoading ? <p className={s.loadingText}>Loading workers...</p> : null}
+                {!workersLoading ? (
+                  <div className={s.tableCard}>
+                    <div className={s.tableScroll}>
+                      <table className={s.table}>
+                        <thead>
+                          <tr>
+                            <th>Username</th>
+                            <th>Created At</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {workers.length === 0 ? (
+                            <tr><td colSpan={2} className={s.emptyCell}>No workers found.</td></tr>
+                          ) : (
+                            workers.map((worker) => (
+                              <tr key={worker.id}>
+                                <td>{worker.username}</td>
+                                <td>{new Date(worker.createdAt).toLocaleString()}</td>
                               </tr>
                             ))
                           )}

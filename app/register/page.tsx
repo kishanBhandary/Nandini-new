@@ -1,12 +1,15 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getApiError, parseApiPayload } from '../../lib/apiResponse';
 
 const gasOptions = [
-  { value: 'KONKAN', label: 'Konkan' },
-  { value: 'BHARATH_GAS', label: 'Bharath Gas' },
+  { value: 'KONKAN', label: 'Konkan Gas' },
+  { value: 'TOTAL_GAS', label: 'Total Gas' },
+  { value: 'HP_GAS', label: 'HP Gas' },
   { value: 'INDIAN_GAS', label: 'Indian Gas' },
+  { value: 'BHARATH_GAS', label: 'Bharath Gas' },
 ] as const;
 
 const gasVariantMap = {
@@ -15,13 +18,21 @@ const gasVariantMap = {
     { value: 'KONKAN_12_KG', label: '12 kg' },
     { value: 'KONKAN_5_5_KG', label: '5.5 kg' },
   ],
+  TOTAL_GAS: [
+    { value: 'TOTAL_17_KG', label: '17 kg' },
+    { value: 'TOTAL_12_KG', label: '12 kg' },
+  ],
+  HP_GAS: [
+    { value: 'HP_19_KG', label: '19 kg' },
+    { value: 'HP_5_KG', label: '5 kg' },
+  ],
+  INDIAN_GAS: [
+    { value: 'INDIAN_19_KG', label: '19 kg' },
+    { value: 'INDIAN_5_KG', label: '5 kg' },
+  ],
   BHARATH_GAS: [
     { value: 'BHARATH_19_KG', label: '19 kg' },
     { value: 'BHARATH_5_KG', label: '5 kg' },
-  ],
-  INDIAN_GAS: [
-    { value: 'INDIAN_17_KG', label: '17 kg' },
-    { value: 'INDIAN_12_KG', label: '12 kg' },
   ],
 } as const;
 
@@ -123,9 +134,18 @@ export default function CustomerRegistrationPage() {
     }
   };
 
+  const router = useRouter();
+
   return (
     <main className="container compact-screen register-page">
       <div className="card compact-card">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem 0', marginBottom: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'inherit', fontSize: '1rem' }}
+        >
+          ← Back
+        </button>
         <h1>Gas Agency Registration</h1>
         <p>Enter customer details, upload Aadhar, and save the gas booking record.</p>
 

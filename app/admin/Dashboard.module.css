@@ -129,15 +129,15 @@
 }
 
 .navItemActive {
-  background: #EFF6FF;
-  color: #2563EB;
-  border-left-color: #2563EB;
+  background: #F3F4F6;
+  color: #111111;
+  border-left-color: #111111;
   font-weight: 600;
 }
 
 .navItemActive:hover {
-  background: #EFF6FF;
-  color: #2563EB;
+  background: #F3F4F6;
+  color: #111111;
 }
 
 .navIcon {
@@ -585,7 +585,7 @@
 .createBtn {
   width: fit-content;
   padding: 0.72rem 1.5rem;
-  background: #2563EB;
+  background: #111111;
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -596,12 +596,12 @@
 }
 
 .createBtn:hover:not(:disabled) {
-  background: #1D4ED8;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  background: #000000;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
 .createBtn:disabled {
-  background: #93C5FD;
+  background: #9CA3AF;
   cursor: not-allowed;
 }
 
@@ -661,6 +661,88 @@
   border-radius: 12px;
   font-size: 0.9rem;
   font-weight: 500;
+}
+
+/* ── Analytics Dashboard ────────────────────────────── */
+.analyticsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.statCard {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 1.35rem 1.25rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #F3F4F6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.statCard:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+  transform: translateY(-1px);
+}
+
+.statLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statNumber {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #111111;
+  letter-spacing: -0.02em;
+}
+
+.chartsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.chartCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #F3F4F6;
+}
+
+.chartCardFull {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #F3F4F6;
+  margin-top: 1.25rem;
+}
+
+.chartTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111111;
+}
+
+.chartSub {
+  margin: 0.2rem 0 1rem;
+  font-size: 0.82rem;
+  color: #9CA3AF;
+}
+
+.chartWrap {
+  width: 100%;
+  min-height: 280px;
 }
 
 /* ── Responsive ─────────────────────────────────────── */
@@ -738,5 +820,23 @@
     width: 100%;
     text-align: center;
     justify-content: center;
+  }
+
+  .analyticsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chartsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .statNumber {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .analyticsGrid {
+    grid-template-columns: 1fr;
   }
 }
