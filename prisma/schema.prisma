@@ -28,8 +28,8 @@ model Customer {
 
 model CancelledCylinder {
   id              String   @id @default(uuid())
-  customerId      String
-  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName    String
   customerPhone   String
   customerAadhar  String

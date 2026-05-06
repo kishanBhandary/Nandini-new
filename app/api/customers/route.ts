@@ -12,6 +12,11 @@ export async function GET(request: Request) {
 
   const filters: Prisma.CustomerWhereInput[] = [];
 
+  // Exclude customers that have been cancelled
+  filters.push({
+    cancelledCylinders: { none: {} },
+  });
+
   if (hasTransaction) {
     filters.push({
       OR: [{ deposit: { gt: 0 } }, { refund: { gt: 0 } }],

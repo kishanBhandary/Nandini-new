@@ -4,17 +4,6 @@ import { prisma } from '../../../lib/prisma';
 export async function GET(request: NextRequest) {
   try {
     const cancelledCylinders = await prisma.cancelledCylinder.findMany({
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            aadhar: true,
-            address: true,
-          },
-        },
-      },
       orderBy: {
         cancelledAt: 'desc',
       },

@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Cylinder already cancelled for this customer.' }, { status: 400 });
     }
 
-    // Create cancellation record and update customer refund
+    // Create cancellation record and delete customer
     const result = await prisma.$transaction(async (tx) => {
       // Create cancelled cylinder record
       const cancelledCylinder = await tx.cancelledCylinder.create({
@@ -67,14 +67,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         },
       });
 
-      // Update customer refund
-      const updatedCustomer = await tx.customer.update({
-        where: { id },
-        data: { refund: refundAmount },
+      // Delete activity logs for this customer
+      await tx.activityLog.deleteMany({
+        where: { customerId: id },
       });
 
-      return { cancelledCylinder, updatedCustomer };
-    });
+      // Set customerId to null so cascade doesn't delete the cancelled record
+      await tx.cancelledCylinder.update({
+        where: { id: cancelledCylinder.id },
+        data: { customerId: { set: null } },
+      });
+
+      // Delete the customer from the main list
+      await tx.customer.delete({
+        where: { id },
+      });
+
+      return { cancelledCylinder };
+    }, { maxWait: 30000, timeout: 30000 });
 
     // Audit log
     const username = request.cookies.get('session_username')?.value || 'unknown';
@@ -92,7 +102,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json(
       {
         cancelledCylinder: result.cancelledCylinder,
-        customer: result.updatedCustomer,
         message: 'Cylinder cancelled successfully.',
       },
       { status: 200 }

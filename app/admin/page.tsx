@@ -653,8 +653,8 @@ export default function AdminDashboardPage() {
       }
       closeCancelModal();
       const [custRes, cancelRes] = await Promise.all([
-        fetch(`/api/customers?page=${pagination.page}&limit=50`).then(r => parseApiPayload(r)),
-        fetch('/api/cancelled-cylinders').then(r => parseApiPayload(r)),
+        fetch(`/api/customers?page=${pagination.page}&limit=50&_t=${Date.now()}`, { cache: 'no-store' }).then(r => parseApiPayload(r)),
+        fetch(`/api/cancelled-cylinders?_t=${Date.now()}`, { cache: 'no-store' }).then(r => parseApiPayload(r)),
       ]);
       setCustomers(Array.isArray(custRes.customers) ? (custRes.customers as Customer[]) : []);
       if (custRes.pagination) setPagination(custRes.pagination as Pagination);
@@ -1258,12 +1258,11 @@ export default function AdminDashboardPage() {
                       <th>Refund</th>
                       <th>Cancelled Date</th>
                       <th>Reason</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCancelled.length === 0 ? (
-                      <tr><td colSpan={8} className={s.emptyCell}>No cancelled cylinder records found.</td></tr>
+                      <tr><td colSpan={7} className={s.emptyCell}>No cancelled cylinder records found.</td></tr>
                     ) : (
                       filteredCancelled.map((cancelled) => (
                         <tr key={cancelled.id}>
@@ -1274,11 +1273,6 @@ export default function AdminDashboardPage() {
                           <td>₹{cancelled.refundAmount}</td>
                           <td>{new Date(cancelled.cancelledAt).toLocaleDateString()}</td>
                           <td>{cancelled.reason || '-'}</td>
-                          <td>
-                            <button type="button" className={s.viewBtn} onClick={() => openCustomerProfile(cancelled.customerId)}>
-                              View Profile
-                            </button>
-                          </td>
                         </tr>
                       ))
                     )}
