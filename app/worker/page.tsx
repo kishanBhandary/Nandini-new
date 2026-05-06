@@ -73,6 +73,7 @@ export default function WorkerDashboardPage() {
   const [pendingRefills, setPendingRefills] = useState<PendingRefill[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingSearch, setPendingSearch] = useState('');
+  const [markingReturnedId, setMarkingReturnedId] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -232,15 +233,23 @@ export default function WorkerDashboardPage() {
   }, [showPending, pendingRefills.length]);
 
   const markCylinderReturned = async (refill: PendingRefill) => {
+    setMarkingReturnedId(refill.id);
     try {
       const res = await fetch(`/api/customers/${refill.customerId}/refill`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refillId: refill.id, cylinderReturned: true }),
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed');
+      }
       setPendingRefills(prev => prev.filter(r => r.id !== refill.id));
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      alert(e?.message || 'Failed to mark cylinder as returned');
+    } finally {
+      setMarkingReturnedId(null);
+    }
   };
 
   const filteredPending = useMemo(() => {
@@ -550,9 +559,10 @@ export default function WorkerDashboardPage() {
                                   type="button"
                                   className={s.viewBtn}
                                   style={{ background: '#059669', color: '#fff' }}
+                                  disabled={markingReturnedId === r.id}
                                   onClick={() => markCylinderReturned(r)}
                                 >
-                                  Mark Returned
+                                  {markingReturnedId === r.id ? 'Marking...' : 'Mark Returned'}
                                 </button>
                               </div>
                             </td>
