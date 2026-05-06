@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getApiError, parseApiPayload } from '../../lib/apiResponse';
 import {
@@ -52,7 +52,35 @@ type AdminUser = {
   createdAt: string;
 };
 
-type DashboardSection = 'dashboard' | 'all-users' | 'cancelled' | 'create-admin' | 'create-worker';
+type Pagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+type DuplicateGroup = {
+  value: string;
+  count: number;
+  customers: Array<{
+    id: string;
+    name: string;
+    phone: string;
+    aadhar: string;
+    address: string;
+    gasType: string;
+    createdAt: string;
+  }>;
+};
+
+type DuplicatesData = {
+  aadhar: { count: number; groups: DuplicateGroup[] };
+  phone: { count: number; groups: DuplicateGroup[] };
+};
+
+type DashboardSection = 'dashboard' | 'all-users' | 'cancelled' | 'create-admin' | 'create-worker' | 'duplicates';
+
+type DateRange = '7d' | '30d' | '90d' | 'all';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -84,12 +112,48 @@ export default function AdminDashboardPage() {
   const [workersLoading, setWorkersLoading] = useState(false);
   const [workersStatus, setWorkersStatus] = useState<string | null>(null);
 
+  // Dark mode
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Pagination
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 });
+
+  // Date range for dashboard
+  const [dateRange, setDateRange] = useState<DateRange>('all');
+
+  // Duplicates
+  const [duplicatesData, setDuplicatesData] = useState<DuplicatesData | null>(null);
+  const [duplicatesLoading, setDuplicatesLoading] = useState(false);
+
+  // Aadhar image modal
+  const [aadharModal, setAadharModal] = useState<{ name: string; url: string } | null>(null);
+
+  // Edit customer modal
+  const [editModal, setEditModal] = useState<Customer | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Customer>>({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [editMessage, setEditMessage] = useState<string | null>(null);
+
+  // Init dark mode from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboard-dark-mode');
+      if (saved === 'true') setDarkMode(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard-dark-mode', String(darkMode));
+    }
+  }, [darkMode]);
+
   // Read section from URL params on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const section = params.get('section');
-      if (section === 'dashboard' || section === 'cancelled' || section === 'create-admin' || section === 'create-worker' || section === 'all-users') {
+      if (section === 'dashboard' || section === 'cancelled' || section === 'create-admin' || section === 'create-worker' || section === 'all-users' || section === 'duplicates') {
         setActiveSection(section as DashboardSection);
       }
     }
@@ -104,32 +168,36 @@ export default function AdminDashboardPage() {
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async (page = 1) => {
     setLoading(true);
     setStatus(null);
     try {
-      const response = await fetch('/api/customers');
+      const response = await fetch(`/api/customers?page=${page}&limit=50`);
       const data = await parseApiPayload(response);
       if (!response.ok) {
         throw new Error(getApiError(data, 'Failed to fetch customers.'));
       }
       const loadedCustomers: Customer[] = Array.isArray(data.customers) ? (data.customers as Customer[]) : [];
       setCustomers(loadedCustomers);
+      if (data.pagination) {
+        setPagination(data.pagination as Pagination);
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to load customers.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Fetch customers and cancelled cylinders in parallel
     setLoading(true);
     Promise.all([
-      fetch('/api/customers').then(r => parseApiPayload(r)),
+      fetch('/api/customers?page=1&limit=50').then(r => parseApiPayload(r)),
       fetch('/api/cancelled-cylinders').then(r => parseApiPayload(r)),
     ]).then(([custData, cancelData]) => {
       setCustomers(Array.isArray(custData.customers) ? (custData.customers as Customer[]) : []);
+      if (custData.pagination) setPagination(custData.pagination as Pagination);
       setCancelledCylinders(Array.isArray(cancelData.cancelledCylinders) ? (cancelData.cancelledCylinders as CancelledCylinder[]) : []);
     }).catch((error) => {
       setStatus(error instanceof Error ? error.message : 'Unable to load data.');
@@ -202,6 +270,22 @@ export default function AdminDashboardPage() {
       fetchWorkers();
     }
   }, [activeSection, workers.length, workersLoading]);
+
+  // Fetch duplicates when section is opened
+  useEffect(() => {
+    if (activeSection === 'duplicates' && !duplicatesData && !duplicatesLoading) {
+      setDuplicatesLoading(true);
+      fetch('/api/customers/duplicates')
+        .then(r => parseApiPayload(r))
+        .then(data => {
+          if (data.duplicates) {
+            setDuplicatesData(data.duplicates as DuplicatesData);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setDuplicatesLoading(false));
+    }
+  }, [activeSection, duplicatesData, duplicatesLoading]);
 
   const createWorker = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,37 +398,62 @@ export default function AdminDashboardPage() {
   const showCancelledSection = activeSection === 'cancelled';
   const showCreateAdminSection = activeSection === 'create-admin';
   const showCreateWorkerSection = activeSection === 'create-worker';
+  const showDuplicatesSection = activeSection === 'duplicates';
+
+  // ── Date range filtering ──
+  const getDateRangeFilter = useCallback((range: DateRange) => {
+    if (range === 'all') return null;
+    const now = new Date();
+    const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
+    return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  }, []);
 
   // ── Analytics data ──
   const activeUsers = useMemo(() => customers.filter(c => !cancelledCustomerIds.has(c.id)), [customers, cancelledCustomerIds]);
 
+  const dateFilteredCustomers = useMemo(() => {
+    const cutoff = getDateRangeFilter(dateRange);
+    if (!cutoff) return customers;
+    return customers.filter(c => new Date(c.createdAt) >= cutoff);
+  }, [customers, dateRange, getDateRangeFilter]);
+
+  const dateFilteredCancelled = useMemo(() => {
+    const cutoff = getDateRangeFilter(dateRange);
+    if (!cutoff) return cancelledCylinders;
+    return cancelledCylinders.filter(c => new Date(c.cancelledAt) >= cutoff);
+  }, [cancelledCylinders, dateRange, getDateRangeFilter]);
+
+  const dateFilteredActive = useMemo(() => {
+    return dateFilteredCustomers.filter(c => !cancelledCustomerIds.has(c.id));
+  }, [dateFilteredCustomers, cancelledCustomerIds]);
+
   const gasTypeData = useMemo(() => {
     const map: Record<string, number> = {};
-    activeUsers.forEach(c => {
+    dateFilteredActive.forEach(c => {
       const label = c.gasType.replace(/_/g, ' ');
       map[label] = (map[label] || 0) + 1;
     });
     return Object.entries(map).map(([name, count]) => ({ name, count }));
-  }, [activeUsers]);
+  }, [dateFilteredActive]);
 
   const gasVariantData = useMemo(() => {
     const map: Record<string, number> = {};
-    activeUsers.forEach(c => {
+    dateFilteredActive.forEach(c => {
       const label = c.gasVariant.replace(/_/g, ' ');
       map[label] = (map[label] || 0) + 1;
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [activeUsers]);
+  }, [dateFilteredActive]);
 
   const monthlyData = useMemo(() => {
     const map: Record<string, { registrations: number; cancellations: number }> = {};
-    customers.forEach(c => {
+    dateFilteredCustomers.forEach(c => {
       const d = new Date(c.createdAt);
       const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
       if (!map[key]) map[key] = { registrations: 0, cancellations: 0 };
       map[key].registrations++;
     });
-    cancelledCylinders.forEach(c => {
+    dateFilteredCancelled.forEach(c => {
       const d = new Date(c.cancelledAt);
       const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
       if (!map[key]) map[key] = { registrations: 0, cancellations: 0 };
@@ -356,10 +465,10 @@ export default function AdminDashboardPage() {
         return parse(a[0]) - parse(b[0]);
       })
       .map(([month, data]) => ({ month, ...data }));
-  }, [customers, cancelledCylinders]);
+  }, [dateFilteredCustomers, dateFilteredCancelled]);
 
-  const totalDeposits = useMemo(() => activeUsers.reduce((sum, c) => sum + c.deposit, 0), [activeUsers]);
-  const totalRefunds = useMemo(() => cancelledCylinders.reduce((sum, c) => sum + c.refundAmount, 0), [cancelledCylinders]);
+  const totalDeposits = useMemo(() => dateFilteredActive.reduce((sum, c) => sum + c.deposit, 0), [dateFilteredActive]);
+  const totalRefunds = useMemo(() => dateFilteredCancelled.reduce((sum, c) => sum + c.refundAmount, 0), [dateFilteredCancelled]);
 
   const PIE_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6'];
   const BAR_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6'];
@@ -403,10 +512,11 @@ export default function AdminDashboardPage() {
       }
       closeCancelModal();
       const [custRes, cancelRes] = await Promise.all([
-        fetch('/api/customers').then(r => parseApiPayload(r)),
+        fetch(`/api/customers?page=${pagination.page}&limit=50`).then(r => parseApiPayload(r)),
         fetch('/api/cancelled-cylinders').then(r => parseApiPayload(r)),
       ]);
       setCustomers(Array.isArray(custRes.customers) ? (custRes.customers as Customer[]) : []);
+      if (custRes.pagination) setPagination(custRes.pagination as Pagination);
       setCancelledCylinders(Array.isArray(cancelRes.cancelledCylinders) ? (cancelRes.cancelledCylinders as CancelledCylinder[]) : []);
     } catch (error) {
       setCancelError(error instanceof Error ? error.message : 'Unable to cancel cylinder.');
@@ -456,8 +566,70 @@ export default function AdminDashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  // ── Pagination handler ──
+  const goToPage = (page: number) => {
+    if (page < 1 || page > pagination.totalPages) return;
+    fetchCustomers(page);
+  };
+
+  // ── Edit customer ──
+  const openEditModal = (customer: Customer) => {
+    setEditModal(customer);
+    setEditForm({
+      name: customer.name,
+      phone: customer.phone,
+      aadhar: customer.aadhar,
+      address: customer.address,
+      gasType: customer.gasType,
+      gasVariant: customer.gasVariant,
+      deposit: customer.deposit,
+      refund: customer.refund,
+    });
+    setEditMessage(null);
+  };
+
+  const closeEditModal = () => {
+    setEditModal(null);
+    setEditForm({});
+    setEditMessage(null);
+  };
+
+  const submitEdit = async () => {
+    if (!editModal || editLoading) return;
+    setEditLoading(true);
+    setEditMessage(null);
+    try {
+      const response = await fetch(`/api/customers/${editModal.id}/edit`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...editForm, performedBy: 'admin' }),
+      });
+      const data = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(getApiError(data, 'Failed to update customer.'));
+      }
+      setEditMessage('Success: Customer updated successfully.');
+      // Refresh customer list
+      fetchCustomers(pagination.page);
+      setTimeout(closeEditModal, 1200);
+    } catch (error) {
+      setEditMessage(`Error: ${error instanceof Error ? error.message : 'Unable to update.'}`);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const GAS_TYPES = ['KONKAN', 'TOTAL_GAS', 'HP_GAS', 'INDIAN_GAS', 'BHARATH_GAS'];
+  const GAS_VARIANTS: Record<string, string[]> = {
+    KONKAN: ['KONKAN_17_KG', 'KONKAN_12_KG', 'KONKAN_5_5_KG'],
+    TOTAL_GAS: ['TOTAL_17_KG', 'TOTAL_12_KG'],
+    HP_GAS: ['HP_19_KG', 'HP_5_KG'],
+    INDIAN_GAS: ['INDIAN_19_KG', 'INDIAN_5_KG', 'INDIAN_17_KG', 'INDIAN_12_KG'],
+    BHARATH_GAS: ['BHARATH_19_KG', 'BHARATH_5_KG'],
+  };
+
   return (
-    <div className={s.shell}>
+    <div className={`${s.shell} ${darkMode ? s.dark : ''}`}>
       <div
         className={isMobileMenuOpen ? s.overlayActive : s.overlay}
         onClick={() => setIsMobileMenuOpen(false)}
@@ -479,6 +651,13 @@ export default function AdminDashboardPage() {
           </svg>
         </button>
         <span className={s.mobileHeaderTitle}>Nandini Enterprises</span>
+        <button className={s.darkToggleBtn} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode" title={darkMode ? 'Light mode' : 'Dark mode'}>
+          {darkMode ? (
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          ) : (
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg>
+          )}
+        </button>
       </div>
 
       {/* ── Sidebar ──────────────────────────────── */}
@@ -519,6 +698,16 @@ export default function AdminDashboardPage() {
           </button>
           <button
             type="button"
+            className={`${s.navItem} ${showDuplicatesSection ? s.navItemActive : ''}`}
+            onClick={() => { setActiveSection('duplicates'); setIsMobileMenuOpen(false); }}
+          >
+            <svg className={s.navIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            Duplicates
+          </button>
+          <button
+            type="button"
             className={`${s.navItem} ${showCreateAdminSection ? s.navItemActive : ''}`}
             onClick={() => { setActiveSection('create-admin'); setIsMobileMenuOpen(false); }}
           >
@@ -539,6 +728,15 @@ export default function AdminDashboardPage() {
           </button>
         </nav>
 
+        {/* Dark mode toggle in sidebar */}
+        <button className={s.darkToggleSidebar} onClick={() => setDarkMode(!darkMode)} title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+          {darkMode ? (
+            <><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Light Mode</>
+          ) : (
+            <><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg> Dark Mode</>
+          )}
+        </button>
+
         <div className={s.statsCard}>
           <div className={s.statsRow}>
             <span className={s.statsLabel}>Active Users</span>
@@ -547,6 +745,10 @@ export default function AdminDashboardPage() {
           <div className={s.statsRow}>
             <span className={s.statsLabel}>Cancelled</span>
             <span className={s.statsValue}>{cancelledCylinders.length}</span>
+          </div>
+          <div className={s.statsRow}>
+            <span className={s.statsLabel}>Total</span>
+            <span className={s.statsValue}>{pagination.total || customers.length}</span>
           </div>
         </div>
 
@@ -568,21 +770,33 @@ export default function AdminDashboardPage() {
                 <h2 className={s.headerTitle}>Dashboard Overview</h2>
                 <p className={s.headerSub}>Business analytics and key metrics at a glance</p>
               </div>
+              <div className={s.dateRangeWrap}>
+                {(['7d', '30d', '90d', 'all'] as DateRange[]).map(range => (
+                  <button
+                    key={range}
+                    type="button"
+                    className={`${s.dateRangeBtn} ${dateRange === range ? s.dateRangeBtnActive : ''}`}
+                    onClick={() => setDateRange(range)}
+                  >
+                    {range === '7d' ? 'Last 7 days' : range === '30d' ? 'Last 30 days' : range === '90d' ? 'Last 90 days' : 'All time'}
+                  </button>
+                ))}
+              </div>
             </header>
 
             {/* Stat Cards */}
             <div className={s.analyticsGrid}>
               <div className={s.statCard}>
                 <span className={s.statLabel}>Total Registrations</span>
-                <span className={s.statNumber}>{customers.length}</span>
+                <span className={s.statNumber}>{dateFilteredCustomers.length}</span>
               </div>
               <div className={s.statCard}>
                 <span className={s.statLabel}>Active Users</span>
-                <span className={s.statNumber}>{activeUsers.length}</span>
+                <span className={s.statNumber}>{dateFilteredActive.length}</span>
               </div>
               <div className={s.statCard}>
                 <span className={s.statLabel}>Cancelled Cylinders</span>
-                <span className={s.statNumber}>{cancelledCylinders.length}</span>
+                <span className={s.statNumber}>{dateFilteredCancelled.length}</span>
               </div>
               <div className={s.statCard}>
                 <span className={s.statLabel}>Total Deposits</span>
@@ -607,11 +821,11 @@ export default function AdminDashboardPage() {
                 <div className={s.chartWrap}>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={gasTypeData} barSize={40}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B7280' }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#F3F4F6'} />
+                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: darkMode ? '#9CA3AF' : '#6B7280' }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: darkMode ? '#9CA3AF' : '#6B7280' }} />
                       <Tooltip
-                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: darkMode ? '#1F2937' : '#fff', color: darkMode ? '#F9FAFB' : '#111' }}
                       />
                       <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                         {gasTypeData.map((_, i) => (
@@ -648,12 +862,12 @@ export default function AdminDashboardPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: darkMode ? '#1F2937' : '#fff', color: darkMode ? '#F9FAFB' : '#111' }}
                       />
                       <Legend
                         iconType="circle"
                         iconSize={8}
-                        wrapperStyle={{ fontSize: 12 }}
+                        wrapperStyle={{ fontSize: 12, color: darkMode ? '#D1D5DB' : undefined }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -679,11 +893,11 @@ export default function AdminDashboardPage() {
                           <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6B7280' }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#F3F4F6'} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: darkMode ? '#9CA3AF' : '#6B7280' }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: darkMode ? '#9CA3AF' : '#6B7280' }} />
                       <Tooltip
-                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13 }}
+                        contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: darkMode ? '#1F2937' : '#fff', color: darkMode ? '#F9FAFB' : '#111' }}
                       />
                       <Area type="monotone" dataKey="registrations" stroke="#3B82F6" strokeWidth={2.5} fill="url(#regGrad)" />
                       <Area type="monotone" dataKey="cancellations" stroke="#EF4444" strokeWidth={2.5} fill="url(#cancelGrad)" />
@@ -702,7 +916,9 @@ export default function AdminDashboardPage() {
             <header className={s.header}>
               <div className={s.headerCopy}>
                 <h2 className={s.headerTitle}>All Registered Users</h2>
-                <p className={s.headerSub}>Search a user and open profile to view all details</p>
+                <p className={s.headerSub}>
+                  {pagination.total > 0 ? `Showing ${((pagination.page - 1) * pagination.limit) + 1}–${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} users` : 'Search a user and open profile to view all details'}
+                </p>
               </div>
               <Link href="/register" className={s.newRegBtn}>
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -731,12 +947,13 @@ export default function AdminDashboardPage() {
                       <th>Phone</th>
                       <th>Aadhaar</th>
                       <th>Gas Type</th>
+                      <th>Aadhar</th>
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCustomers.length === 0 ? (
-                      <tr><td colSpan={5} className={s.emptyCell}>No users found for this search.</td></tr>
+                      <tr><td colSpan={6} className={s.emptyCell}>No users found for this search.</td></tr>
                     ) : (
                       filteredCustomers.map((customer) => (
                         <tr key={customer.id}>
@@ -745,9 +962,29 @@ export default function AdminDashboardPage() {
                           <td>{customer.aadhar}</td>
                           <td>{customer.gasType}</td>
                           <td>
+                            {customer.aadharImageUrl ? (
+                              <button
+                                type="button"
+                                className={s.imgPreviewBtn}
+                                onClick={() => setAadharModal({ name: customer.name, url: customer.aadharImageUrl! })}
+                                title="View Aadhar"
+                              >
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>None</span>
+                            )}
+                          </td>
+                          <td>
                             <div className={s.actionCell}>
                               <button type="button" className={s.viewBtn} onClick={() => openCustomerProfile(customer.id)}>
-                                View Profile
+                                View
+                              </button>
+                              <button type="button" className={s.editBtn} onClick={() => openEditModal(customer)}>
+                                Edit
                               </button>
                               <button
                                 type="button"
@@ -755,7 +992,7 @@ export default function AdminDashboardPage() {
                                 disabled={cancellingId === customer.id}
                                 onClick={() => openCancelModal(customer)}
                               >
-                                {cancellingId === customer.id ? 'Cancelling…' : 'Cancel Cylinder'}
+                                {cancellingId === customer.id ? 'Cancelling…' : 'Cancel'}
                               </button>
                             </div>
                           </td>
@@ -766,6 +1003,39 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className={s.paginationWrap}>
+                <button className={s.pageBtn} disabled={pagination.page <= 1} onClick={() => goToPage(pagination.page - 1)}>
+                  ← Prev
+                </button>
+                {Array.from({ length: Math.min(pagination.totalPages, 7) }, (_, i) => {
+                  let pageNum: number;
+                  if (pagination.totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 4) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 3) {
+                    pageNum = pagination.totalPages - 6 + i;
+                  } else {
+                    pageNum = pagination.page - 3 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`${s.pageBtn} ${pagination.page === pageNum ? s.pageBtnActive : ''}`}
+                      onClick={() => goToPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button className={s.pageBtn} disabled={pagination.page >= pagination.totalPages} onClick={() => goToPage(pagination.page + 1)}>
+                  Next →
+                </button>
+              </div>
+            )}
           </>
         ) : null}
 
@@ -836,6 +1106,110 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </>
+        ) : null}
+
+        {/* ── Duplicates Detection ─────────────────── */}
+        {!loading && showDuplicatesSection ? (
+          <div className={s.createSection} style={{ maxWidth: '100%' }}>
+            <div className={s.createCard}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h2 className={s.createTitle}>Duplicate Detection</h2>
+                  <p className={s.createSub}>Customers flagged with the same Aadhar or phone number</p>
+                </div>
+                <button
+                  type="button"
+                  className={s.createBtn}
+                  disabled={duplicatesLoading}
+                  onClick={() => {
+                    setDuplicatesData(null);
+                    setDuplicatesLoading(true);
+                    fetch('/api/customers/duplicates')
+                      .then(r => parseApiPayload(r))
+                      .then(data => {
+                        if (data.duplicates) setDuplicatesData(data.duplicates as DuplicatesData);
+                      })
+                      .catch(console.error)
+                      .finally(() => setDuplicatesLoading(false));
+                  }}
+                >
+                  {duplicatesLoading ? 'Scanning...' : 'Refresh'}
+                </button>
+              </div>
+
+              {duplicatesLoading ? <p className={s.loadingText}>Scanning for duplicates...</p> : null}
+
+              {duplicatesData && !duplicatesLoading ? (
+                <>
+                  {duplicatesData.aadhar.count === 0 && duplicatesData.phone.count === 0 ? (
+                    <div className={`${s.message} ${s.messageSuccess}`} style={{ marginTop: '1rem' }}>
+                      No duplicates found. All Aadhar and phone numbers are unique.
+                    </div>
+                  ) : null}
+
+                  {duplicatesData.aadhar.count > 0 ? (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <h3 className={s.adminListTitle}>Duplicate Aadhar Numbers ({duplicatesData.aadhar.count} groups)</h3>
+                      {duplicatesData.aadhar.groups.map((group) => (
+                        <div key={group.value} className={s.duplicateGroup}>
+                          <p className={s.duplicateGroupLabel}>Aadhar: {group.value} ({group.count} customers)</p>
+                          <div className={s.tableCard}>
+                            <div className={s.tableScroll}>
+                              <table className={s.table}>
+                                <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Gas Type</th><th>Registered</th><th>Action</th></tr></thead>
+                                <tbody>
+                                  {group.customers.map(c => (
+                                    <tr key={c.id}>
+                                      <td>{c.name}</td>
+                                      <td>{c.phone}</td>
+                                      <td>{c.address}</td>
+                                      <td>{c.gasType}</td>
+                                      <td>{new Date(c.createdAt).toLocaleDateString()}</td>
+                                      <td><button type="button" className={s.viewBtn} onClick={() => openCustomerProfile(c.id)}>View</button></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {duplicatesData.phone.count > 0 ? (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <h3 className={s.adminListTitle}>Duplicate Phone Numbers ({duplicatesData.phone.count} groups)</h3>
+                      {duplicatesData.phone.groups.map((group) => (
+                        <div key={group.value} className={s.duplicateGroup}>
+                          <p className={s.duplicateGroupLabel}>Phone: {group.value} ({group.count} customers)</p>
+                          <div className={s.tableCard}>
+                            <div className={s.tableScroll}>
+                              <table className={s.table}>
+                                <thead><tr><th>Name</th><th>Aadhar</th><th>Address</th><th>Gas Type</th><th>Registered</th><th>Action</th></tr></thead>
+                                <tbody>
+                                  {group.customers.map(c => (
+                                    <tr key={c.id}>
+                                      <td>{c.name}</td>
+                                      <td>{c.aadhar}</td>
+                                      <td>{c.address}</td>
+                                      <td>{c.gasType}</td>
+                                      <td>{new Date(c.createdAt).toLocaleDateString()}</td>
+                                      <td><button type="button" className={s.viewBtn} onClick={() => openCustomerProfile(c.id)}>View</button></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </div>
         ) : null}
 
         {/* ── Create Admin ─────────────────────────── */}
@@ -1030,6 +1404,89 @@ export default function AdminDashboardPage() {
               <button type="button" className={s.modalCancelBtn} onClick={closeCancelModal}>Go Back</button>
               <button type="button" className={s.modalConfirmBtn} disabled={!!cancellingId} onClick={submitCancel}>
                 {cancellingId ? 'Processing…' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Aadhar Image Modal ─────────────────────── */}
+      {aadharModal ? (
+        <div className={s.modalBackdrop} onClick={() => setAadharModal(null)}>
+          <div className={s.aadharModalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 className={s.modalTitle}>Aadhar - {aadharModal.name}</h3>
+              <button type="button" className={s.modalCancelBtn} onClick={() => setAadharModal(null)} style={{ margin: 0 }}>✕</button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={aadharModal.url}
+              alt={`Aadhar of ${aadharModal.name}`}
+              style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }}
+            />
+            <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
+              <a href={aadharModal.url} target="_blank" rel="noreferrer" className={s.viewBtn} style={{ textDecoration: 'none', display: 'inline-block' }}>
+                Open Full Size
+              </a>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Edit Customer Modal ────────────────────── */}
+      {editModal ? (
+        <div className={s.modalBackdrop} onClick={closeEditModal}>
+          <div className={s.editModalCard} onClick={(e) => e.stopPropagation()}>
+            <h3 className={s.modalTitle}>Edit Customer</h3>
+            <p className={s.modalSub}>Editing: <strong>{editModal.name}</strong></p>
+            {editMessage ? (
+              <div className={`${s.message} ${editMessage.startsWith('Success:') ? s.messageSuccess : s.messageError}`} style={{ marginBottom: '0.75rem' }}>
+                {editMessage}
+              </div>
+            ) : null}
+            <div className={s.editGrid}>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Name</label>
+                <input className={s.modalInput} value={editForm.name || ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Phone</label>
+                <input className={s.modalInput} value={editForm.phone || ''} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Aadhar</label>
+                <input className={s.modalInput} value={editForm.aadhar || ''} onChange={e => setEditForm(f => ({ ...f, aadhar: e.target.value }))} />
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Address</label>
+                <input className={s.modalInput} value={editForm.address || ''} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Gas Type</label>
+                <select className={s.modalInput} value={editForm.gasType || ''} onChange={e => setEditForm(f => ({ ...f, gasType: e.target.value, gasVariant: '' }))}>
+                  {GAS_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                </select>
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Gas Variant</label>
+                <select className={s.modalInput} value={editForm.gasVariant || ''} onChange={e => setEditForm(f => ({ ...f, gasVariant: e.target.value }))}>
+                  <option value="">Select variant</option>
+                  {(GAS_VARIANTS[editForm.gasType || ''] || []).map(v => <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>)}
+                </select>
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Deposit (₹)</label>
+                <input className={s.modalInput} type="number" min="0" value={editForm.deposit ?? ''} onChange={e => setEditForm(f => ({ ...f, deposit: Number(e.target.value) }))} />
+              </div>
+              <div className={s.modalField}>
+                <label className={s.modalLabel}>Refund (₹)</label>
+                <input className={s.modalInput} type="number" min="0" value={editForm.refund ?? ''} onChange={e => setEditForm(f => ({ ...f, refund: Number(e.target.value) }))} />
+              </div>
+            </div>
+            <div className={s.modalActions}>
+              <button type="button" className={s.modalCancelBtn} onClick={closeEditModal}>Cancel</button>
+              <button type="button" className={s.createBtn} disabled={editLoading} onClick={submitEdit}>
+                {editLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

@@ -23,6 +23,7 @@ model Customer {
   updatedAt       DateTime @updatedAt
   
   cancelledCylinders CancelledCylinder[]
+  activityLogs       ActivityLog[]
 }
 
 model CancelledCylinder {
@@ -39,6 +40,18 @@ model CancelledCylinder {
   cancelledAt     DateTime @default(now())
   reason          String?
   
+  @@index([customerId])
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  action      String   // EDIT, CANCEL, CREATE, DEPOSIT_CHANGE, REFUND_CHANGE
+  changes     String?  // JSON string of field changes
+  performedBy String?  // username or role of who did it
+  createdAt   DateTime @default(now())
+
   @@index([customerId])
 }
 

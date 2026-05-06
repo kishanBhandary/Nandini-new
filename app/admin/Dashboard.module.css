@@ -840,3 +840,561 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Pagination ─────────────────────────────────────── */
+.paginationWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pageBtn {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageBtnActive {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
+}
+
+.pageBtnActive:hover {
+  background: #000000;
+}
+
+/* ── Edit Button ────────────────────────────────────── */
+.editBtn {
+  padding: 0.42rem 0.85rem;
+  background: #2563EB;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.editBtn:hover {
+  background: #1D4ED8;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+/* ── Image Preview Button ───────────────────────────── */
+.imgPreviewBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.15s ease;
+}
+
+.imgPreviewBtn:hover {
+  background: #E5E7EB;
+  color: #111111;
+}
+
+/* ── Aadhar Modal Card ──────────────────────────────── */
+.aadharModalCard {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 600px;
+  padding: 1.5rem;
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+/* ── Edit Modal Card ────────────────────────────────── */
+.editModalCard {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 2rem;
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+.editGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 480px) {
+  .editGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Date Range Selector ────────────────────────────── */
+.dateRangeWrap {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.dateRangeBtn {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #6B7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dateRangeBtn:hover {
+  background: #F3F4F6;
+  color: #374151;
+}
+
+.dateRangeBtnActive {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
+}
+
+.dateRangeBtnActive:hover {
+  background: #000000;
+}
+
+/* ── Dark Mode Toggle ───────────────────────────────── */
+.darkToggleBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.darkToggleBtn:hover {
+  background: #F3F4F6;
+}
+
+.darkToggleSidebar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  background: #F9FAFB;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.darkToggleSidebar:hover {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+/* ── Duplicate Group ────────────────────────────────── */
+.duplicateGroup {
+  margin-bottom: 1rem;
+}
+
+.duplicateGroupLabel {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #DC2626;
+  margin: 0.5rem 0;
+}
+
+/* ── Mobile: show dark mode btn in header ───────────── */
+@media (max-width: 768px) {
+  .darkToggleBtn {
+    display: flex;
+  }
+
+  .aadharModalCard,
+  .editModalCard {
+    max-width: 95vw;
+  }
+
+  .editGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .dateRangeWrap {
+    width: 100%;
+  }
+
+  .dateRangeBtn {
+    flex: 1;
+    text-align: center;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+  }
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* ── DARK MODE ────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════ */
+.dark {
+  background: #111827;
+}
+
+.dark .sidebar {
+  background: #1F2937;
+  border-right-color: #374151;
+}
+
+.dark .brand {
+  color: #F9FAFB;
+}
+
+.dark .brandSub {
+  color: #9CA3AF;
+}
+
+.dark .navItem {
+  color: #D1D5DB;
+}
+
+.dark .navItem:hover {
+  background: #374151;
+  color: #F9FAFB;
+}
+
+.dark .navItemActive {
+  background: #374151;
+  color: #F9FAFB;
+  border-left-color: #F9FAFB;
+}
+
+.dark .statsCard {
+  background: #374151;
+  border-color: #4B5563;
+}
+
+.dark .statsLabel {
+  color: #9CA3AF;
+}
+
+.dark .statsValue {
+  color: #F9FAFB;
+}
+
+.dark .downloadBtn {
+  background: #374151;
+  color: #D1D5DB;
+  border-color: #4B5563;
+}
+
+.dark .downloadBtn:hover:not(:disabled) {
+  background: #4B5563;
+  border-color: #6B7280;
+}
+
+.dark .main {
+  background: #111827;
+}
+
+.dark .headerTitle {
+  color: #F9FAFB;
+}
+
+.dark .headerSub {
+  color: #9CA3AF;
+}
+
+.dark .searchInput {
+  background: #1F2937;
+  border-color: #374151;
+  color: #F9FAFB;
+}
+
+.dark .searchInput:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.dark .tableCard {
+  background: #1F2937;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dark .table th {
+  background: #374151;
+  color: #9CA3AF;
+  border-bottom-color: #4B5563;
+}
+
+.dark .table td {
+  color: #D1D5DB;
+  border-bottom-color: #374151;
+}
+
+.dark .table tbody tr:hover {
+  background: #374151;
+}
+
+.dark .emptyCell {
+  color: #6B7280;
+}
+
+.dark .statCard {
+  background: #1F2937;
+  border-color: #374151;
+}
+
+.dark .statCard:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dark .statLabel {
+  color: #9CA3AF;
+}
+
+.dark .statNumber {
+  color: #F9FAFB;
+}
+
+.dark .chartCard,
+.dark .chartCardFull {
+  background: #1F2937;
+  border-color: #374151;
+}
+
+.dark .chartTitle {
+  color: #F9FAFB;
+}
+
+.dark .chartSub {
+  color: #6B7280;
+}
+
+.dark .createCard {
+  background: #1F2937;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dark .createTitle {
+  color: #F9FAFB;
+}
+
+.dark .createSub {
+  color: #9CA3AF;
+}
+
+.dark .formLabel {
+  color: #D1D5DB;
+}
+
+.dark .formInput {
+  background: #374151;
+  border-color: #4B5563;
+  color: #F9FAFB;
+}
+
+.dark .formInput:focus {
+  border-color: #3B82F6;
+  background: #1F2937;
+}
+
+.dark .adminListTitle {
+  color: #F9FAFB;
+}
+
+.dark .statusError {
+  background: #7F1D1D;
+  color: #FCA5A5;
+  border-color: #991B1B;
+}
+
+.dark .loadingText {
+  color: #9CA3AF;
+}
+
+.dark .message {
+  background: #374151;
+  color: #D1D5DB;
+}
+
+.dark .messageSuccess {
+  background: #064E3B;
+  color: #A7F3D0;
+  border-color: #059669;
+}
+
+.dark .messageError {
+  background: #7F1D1D;
+  color: #FCA5A5;
+  border-color: #991B1B;
+}
+
+.dark .modalCard,
+.dark .aadharModalCard,
+.dark .editModalCard {
+  background: #1F2937;
+}
+
+.dark .modalTitle {
+  color: #F9FAFB;
+}
+
+.dark .modalSub {
+  color: #9CA3AF;
+}
+
+.dark .modalLabel {
+  color: #D1D5DB;
+}
+
+.dark .modalInput {
+  background: #374151;
+  border-color: #4B5563;
+  color: #F9FAFB;
+}
+
+.dark .modalInput:focus {
+  border-color: #3B82F6;
+  background: #1F2937;
+}
+
+.dark .modalCancelBtn {
+  background: #374151;
+  color: #D1D5DB;
+  border-color: #4B5563;
+}
+
+.dark .modalCancelBtn:hover {
+  background: #4B5563;
+}
+
+.dark .pageBtn {
+  background: #1F2937;
+  color: #D1D5DB;
+  border-color: #374151;
+}
+
+.dark .pageBtn:hover:not(:disabled) {
+  background: #374151;
+}
+
+.dark .pageBtnActive {
+  background: #F9FAFB;
+  color: #111827;
+  border-color: #F9FAFB;
+}
+
+.dark .dateRangeBtn {
+  background: #1F2937;
+  color: #9CA3AF;
+  border-color: #374151;
+}
+
+.dark .dateRangeBtn:hover {
+  background: #374151;
+  color: #D1D5DB;
+}
+
+.dark .dateRangeBtnActive {
+  background: #F9FAFB;
+  color: #111827;
+  border-color: #F9FAFB;
+}
+
+.dark .newRegBtn {
+  background: #F9FAFB;
+  color: #111827;
+}
+
+.dark .newRegBtn:hover {
+  background: #ffffff;
+}
+
+.dark .darkToggleSidebar {
+  background: #374151;
+  color: #D1D5DB;
+  border-color: #4B5563;
+}
+
+.dark .darkToggleSidebar:hover {
+  background: #4B5563;
+}
+
+.dark .imgPreviewBtn {
+  background: #374151;
+  border-color: #4B5563;
+  color: #D1D5DB;
+}
+
+.dark .imgPreviewBtn:hover {
+  background: #4B5563;
+  color: #F9FAFB;
+}
+
+.dark .duplicateGroupLabel {
+  color: #FCA5A5;
+}
+
+.dark .mobileHeader {
+  background: #1F2937;
+  border-bottom-color: #374151;
+}
+
+.dark .mobileHeaderTitle {
+  color: #F9FAFB;
+}
+
+.dark .mobileToggle {
+  color: #D1D5DB;
+}
+
+.dark .mobileToggle:hover {
+  background: #374151;
+  color: #F9FAFB;
+}
+
+.dark .darkToggleBtn {
+  color: #D1D5DB;
+}
+
+.dark .darkToggleBtn:hover {
+  background: #374151;
+}

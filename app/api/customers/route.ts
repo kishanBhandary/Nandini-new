@@ -6,6 +6,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const search = url.searchParams.get('search')?.trim();
   const hasTransaction = url.searchParams.get('hasTransaction') === 'true';
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10)));
+  const skip = (page - 1) * limit;
 
   const filters: Prisma.CustomerWhereInput[] = [];
 
@@ -31,13 +34,25 @@ export async function GET(request: Request) {
 
   const where: Prisma.CustomerWhereInput | undefined = filters.length > 0 ? { AND: filters } : undefined;
 
-  const customers = await prisma.customer.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-  });
+  const [customers, total] = await Promise.all([
+    prisma.customer.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.customer.count({ where }),
+  ]);
 
-  const res = NextResponse.json({ customers });
+  const res = NextResponse.json({
+    customers,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
   res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=10');
   return res;
 }
