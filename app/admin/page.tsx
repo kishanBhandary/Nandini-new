@@ -78,7 +78,24 @@ type DuplicatesData = {
   phone: { count: number; groups: DuplicateGroup[] };
 };
 
-type DashboardSection = 'dashboard' | 'all-users' | 'cancelled' | 'create-admin' | 'create-worker' | 'duplicates' | 'audit-log' | 'sessions' | 'permissions';
+type DashboardSection = 'dashboard' | 'all-users' | 'cancelled' | 'pending-cylinders' | 'create-admin' | 'create-worker' | 'duplicates' | 'audit-log' | 'sessions' | 'permissions';
+
+type PendingRefill = {
+  id: string;
+  customerId: string;
+  amount: number;
+  cylinderReturned: boolean;
+  performedBy: string | null;
+  createdAt: string;
+  customer: {
+    id: string;
+    name: string;
+    phone: string;
+    aadhar: string;
+    gasType: string;
+    gasVariant: string;
+  };
+};
 
 type DateRange = '7d' | '30d' | '90d' | 'all';
 
@@ -186,6 +203,11 @@ export default function AdminDashboardPage() {
   const [editingPermUserId, setEditingPermUserId] = useState<string | null>(null);
   const [editingPerms, setEditingPerms] = useState<string[]>([]);
 
+  // Pending cylinders
+  const [pendingRefills, setPendingRefills] = useState<PendingRefill[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingSearch, setPendingSearch] = useState('');
+
   // Init dark mode from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -205,7 +227,7 @@ export default function AdminDashboardPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const section = params.get('section');
-      if (section === 'dashboard' || section === 'cancelled' || section === 'create-admin' || section === 'create-worker' || section === 'all-users' || section === 'duplicates' || section === 'audit-log' || section === 'sessions' || section === 'permissions') {
+      if (section === 'dashboard' || section === 'cancelled' || section === 'pending-cylinders' || section === 'create-admin' || section === 'create-worker' || section === 'all-users' || section === 'duplicates' || section === 'audit-log' || section === 'sessions' || section === 'permissions') {
         setActiveSection(section as DashboardSection);
       }
     }
@@ -534,12 +556,48 @@ export default function AdminDashboardPage() {
   const showDashboardSection = activeSection === 'dashboard';
   const showUsersSection = activeSection === 'all-users';
   const showCancelledSection = activeSection === 'cancelled';
+  const showPendingSection = activeSection === 'pending-cylinders';
   const showCreateAdminSection = activeSection === 'create-admin';
   const showCreateWorkerSection = activeSection === 'create-worker';
   const showDuplicatesSection = activeSection === 'duplicates';
   const showAuditLogSection = activeSection === 'audit-log';
   const showSessionsSection = activeSection === 'sessions';
   const showPermissionsSection = activeSection === 'permissions';
+
+  // Fetch pending cylinders when section becomes active
+  useEffect(() => {
+    if (showPendingSection && pendingRefills.length === 0) {
+      setPendingLoading(true);
+      fetch('/api/pending-cylinders')
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data.pendingRefills)) setPendingRefills(data.pendingRefills);
+        })
+        .catch(() => {})
+        .finally(() => setPendingLoading(false));
+    }
+  }, [showPendingSection, pendingRefills.length]);
+
+  const markCylinderReturned = async (refill: PendingRefill) => {
+    try {
+      const res = await fetch(`/api/customers/${refill.customerId}/refill`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refillId: refill.id, cylinderReturned: true }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setPendingRefills(prev => prev.filter(r => r.id !== refill.id));
+    } catch { /* ignore */ }
+  };
+
+  const filteredPending = useMemo(() => {
+    const q = pendingSearch.trim().toLowerCase();
+    if (!q) return pendingRefills;
+    return pendingRefills.filter(r => {
+      const text = [r.customer.name, r.customer.phone, r.customer.aadhar, r.customer.gasType, r.customer.gasVariant].join(' ').toLowerCase();
+      return text.includes(q);
+    });
+  }, [pendingRefills, pendingSearch]);
 
   // ── Date range filtering ──
   const getDateRangeFilter = useCallback((range: DateRange) => {
@@ -851,6 +909,17 @@ export default function AdminDashboardPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
             Cancelled Cylinders
+          </button>
+          <button
+            type="button"
+            className={`${s.navItem} ${showPendingSection ? s.navItemActive : ''}`}
+            onClick={() => { setActiveSection('pending-cylinders'); setIsMobileMenuOpen(false); }}
+          >
+            <svg className={s.navIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Pending Cylinders
+            {pendingRefills.length > 0 && <span style={{ marginLeft: 'auto', background: '#F59E0B', color: '#fff', borderRadius: '9999px', padding: '0.1rem 0.5rem', fontSize: '0.7rem', fontWeight: 700 }}>{pendingRefills.length}</span>}
           </button>
           <button
             type="button"
@@ -1280,6 +1349,80 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+          </>
+        ) : null}
+
+        {/* ── Pending Cylinders ────────────────────── */}
+        {!loading && showPendingSection ? (
+          <>
+            <header className={s.header}>
+              <div className={s.headerCopy}>
+                <h2 className={s.headerTitle}>Pending Cylinders</h2>
+                <p className={s.headerSub}>Customers who have not returned their empty cylinder after refill</p>
+              </div>
+            </header>
+
+            <div className={s.searchWrap}>
+              <input
+                type="text"
+                className={s.searchInput}
+                value={pendingSearch}
+                onChange={(e) => setPendingSearch(e.target.value)}
+                placeholder="Search by name, phone, or aadhaar"
+              />
+            </div>
+
+            {pendingLoading ? (
+              <p style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Loading…</p>
+            ) : (
+              <div className={s.tableCard}>
+                <div className={s.tableScroll}>
+                  <table className={s.table}>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Gas Type</th>
+                        <th>Refill Amount</th>
+                        <th>Refill Date</th>
+                        <th>Added By</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPending.length === 0 ? (
+                        <tr><td colSpan={7} className={s.emptyCell}>No pending cylinders found.</td></tr>
+                      ) : (
+                        filteredPending.map((r) => (
+                          <tr key={r.id}>
+                            <td>{r.customer.name}</td>
+                            <td>{r.customer.phone}</td>
+                            <td>{r.customer.gasVariant}</td>
+                            <td>₹{r.amount}</td>
+                            <td>{new Date(r.createdAt).toLocaleDateString()}</td>
+                            <td>{r.performedBy || '-'}</td>
+                            <td>
+                              <div className={s.actionCell}>
+                                <button type="button" className={s.viewBtn} onClick={() => openCustomerProfile(r.customer.id)}>
+                                  View
+                                </button>
+                                <button
+                                  type="button"
+                                  className={s.editBtn}
+                                  onClick={() => markCylinderReturned(r)}
+                                >
+                                  Mark Returned
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </>
         ) : null}
 

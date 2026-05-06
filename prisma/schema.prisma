@@ -24,6 +24,7 @@ model Customer {
   
   cancelledCylinders CancelledCylinder[]
   activityLogs       ActivityLog[]
+  refills            Refill[]
 }
 
 model CancelledCylinder {
@@ -100,6 +101,20 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+model Refill {
+  id               String   @id @default(uuid())
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount           Int
+  cylinderReturned Boolean  @default(false)
+  performedBy      String?
+  createdAt        DateTime @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([cylinderReturned])
 }
 
 enum UserRole {
