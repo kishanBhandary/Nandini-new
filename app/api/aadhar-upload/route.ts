@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file');
 
-    if (!(file instanceof File)) {
+    if (!file || typeof file === 'string') {
       return NextResponse.json({ error: 'Aadhar image file is required.' }, { status: 400 });
     }
 
@@ -48,7 +48,10 @@ export async function POST(request: Request) {
     const safeName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '');
     const filePath = `aadhar-${Date.now()}-${safeName}`;
 
-    const { data, error } = await supabaseAdmin.storage.from(aadharBucketName).upload(filePath, file, {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { data, error } = await supabaseAdmin.storage.from(aadharBucketName).upload(filePath, buffer, {
       cacheControl: '3600',
       contentType: file.type || 'application/octet-stream',
       upsert: false,
@@ -67,6 +70,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Aadhar upload error:', error);
-    return NextResponse.json({ error: 'Failed to upload Aadhar image to Supabase.' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to upload Aadhar image to Supabase.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
