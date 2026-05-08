@@ -209,6 +209,12 @@ export default function AdminDashboardPage() {
   const [pendingSearch, setPendingSearch] = useState('');
   const [markingReturnedId, setMarkingReturnedId] = useState<string | null>(null);
 
+  // Reset password
+  const [resetPasswordModal, setResetPasswordModal] = useState<{ userId: string; username: string; role: 'ADMIN' | 'WORKER' } | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordMessage, setResetPasswordMessage] = useState<string | null>(null);
+
   // Init dark mode from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -446,6 +452,55 @@ export default function AdminDashboardPage() {
     } catch (e) {
       setPermMessage(`Error: ${e instanceof Error ? e.message : 'Failed'}`);
     }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordModal) return;
+
+    setResetPasswordMessage(null);
+    setResetPasswordLoading(true);
+
+    try {
+      const response = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: resetPasswordModal.userId,
+          newPassword: resetPasswordValue,
+        }),
+      });
+
+      const data = await parseApiPayload(response);
+
+      if (!response.ok) {
+        setResetPasswordMessage(getApiError(data, 'Failed to reset password.'));
+        return;
+      }
+
+      setResetPasswordMessage('Success: Password reset successfully!');
+      setTimeout(() => {
+        setResetPasswordModal(null);
+        setResetPasswordValue('');
+        setResetPasswordMessage(null);
+      }, 1500);
+    } catch (error) {
+      setResetPasswordMessage(error instanceof Error ? error.message : 'Password reset failed.');
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
+
+  const openResetPasswordModal = (userId: string, username: string, role: 'ADMIN' | 'WORKER') => {
+    setResetPasswordModal({ userId, username, role });
+    setResetPasswordValue('');
+    setResetPasswordMessage(null);
+  };
+
+  const closeResetPasswordModal = () => {
+    setResetPasswordModal(null);
+    setResetPasswordValue('');
+    setResetPasswordMessage(null);
   };
 
   const createWorker = async (e: React.FormEvent) => {
@@ -1985,16 +2040,26 @@ export default function AdminDashboardPage() {
                           <tr>
                             <th>Username</th>
                             <th>Created At</th>
+                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
                           {admins.length === 0 ? (
-                            <tr><td colSpan={2} className={s.emptyCell}>No admins found.</td></tr>
+                            <tr><td colSpan={3} className={s.emptyCell}>No admins found.</td></tr>
                           ) : (
                             admins.map((admin) => (
                               <tr key={admin.id}>
                                 <td>{admin.username}</td>
                                 <td>{new Date(admin.createdAt).toLocaleString()}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className={s.editBtn}
+                                    onClick={() => openResetPasswordModal(admin.id, admin.username, 'ADMIN')}
+                                  >
+                                    Reset Password
+                                  </button>
+                                </td>
                               </tr>
                             ))
                           )}
@@ -2063,16 +2128,26 @@ export default function AdminDashboardPage() {
                           <tr>
                             <th>Username</th>
                             <th>Created At</th>
+                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
                           {workers.length === 0 ? (
-                            <tr><td colSpan={2} className={s.emptyCell}>No workers found.</td></tr>
+                            <tr><td colSpan={3} className={s.emptyCell}>No workers found.</td></tr>
                           ) : (
                             workers.map((worker) => (
                               <tr key={worker.id}>
                                 <td>{worker.username}</td>
                                 <td>{new Date(worker.createdAt).toLocaleString()}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className={s.editBtn}
+                                    onClick={() => openResetPasswordModal(worker.id, worker.username, 'WORKER')}
+                                  >
+                                    Reset Password
+                                  </button>
+                                </td>
                               </tr>
                             ))
                           )}
@@ -2086,6 +2161,55 @@ export default function AdminDashboardPage() {
           </div>
         ) : null}
       </main>
+
+      {/* ── Reset Password Modal ──────────────────── */}
+      {resetPasswordModal ? (
+        <div className={s.modalBackdrop} onClick={closeResetPasswordModal}>
+          <div className={s.modalCard} onClick={(e) => e.stopPropagation()}>
+            <h3 className={s.modalTitle}>Reset Password</h3>
+            <p className={s.modalSub}>Reset password for <strong>{resetPasswordModal.role.toLowerCase()}: {resetPasswordModal.username}</strong></p>
+            {resetPasswordMessage ? (
+              <p className={resetPasswordMessage.startsWith('Success:') ? s.messageSuccess : s.modalError}>
+                {resetPasswordMessage}
+              </p>
+            ) : null}
+            <form onSubmit={handleResetPassword}>
+              <div className={s.modalField}>
+                <label className={s.modalLabel} htmlFor="reset-password">New Password</label>
+                <input
+                  id="reset-password"
+                  type="password"
+                  className={s.modalInput}
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                  placeholder="Enter new password"
+                  required
+                  minLength={3}
+                  autoFocus
+                  disabled={resetPasswordLoading}
+                />
+              </div>
+              <div className={s.modalActions}>
+                <button
+                  type="button"
+                  className={s.modalCancelBtn}
+                  onClick={closeResetPasswordModal}
+                  disabled={resetPasswordLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={s.modalConfirmBtn}
+                  disabled={resetPasswordLoading || !resetPasswordValue}
+                >
+                  {resetPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Cancel Cylinder Modal ──────────────────── */}
       {cancelModal ? (
