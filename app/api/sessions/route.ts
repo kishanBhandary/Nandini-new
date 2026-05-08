@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { requireAdmin } from '../../../lib/apiAuth';
 
 const db = prisma as unknown as {
   session: {
@@ -43,6 +44,9 @@ const db = prisma as unknown as {
 };
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const sessions = await db.session.findMany({
       where: { active: true },
@@ -63,6 +67,9 @@ export async function GET() {
 
 // Force logout a session
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('id');

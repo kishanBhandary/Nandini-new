@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '../../../../lib/prisma';
 import ProfileActions from '../../../admin/users/[id]/profile-actions';
@@ -35,9 +34,9 @@ export default async function WorkerUserProfilePage({ params }: WorkerUserProfil
     <main className="admin-profile-page-shell">
       <div className="admin-profile-page-card">
         <div className="admin-profile-utility-row">
-          <Link href="/worker" className="admin-profile-back-link">
+          <a href="/worker" className="admin-profile-back-link">
             Back to Dashboard
-          </Link>
+          </a>
         </div>
 
         <div className="admin-profile-page-header">
@@ -97,6 +96,7 @@ export default async function WorkerUserProfilePage({ params }: WorkerUserProfil
 
         <ProfileActions
           className="profile-actions-bottom"
+          basePath="/worker"
           customer={{
             id: customer.id,
             name: customer.name,

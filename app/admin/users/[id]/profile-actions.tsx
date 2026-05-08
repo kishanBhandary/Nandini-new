@@ -20,6 +20,7 @@ type CustomerProfileData = {
 type ProfileActionsProps = {
   customer: CustomerProfileData;
   className?: string;
+  basePath?: string;
 };
 
 function DownloadIcon() {
@@ -101,7 +102,7 @@ async function buildProfilePdf(customer: CustomerProfileData) {
   return doc;
 }
 
-export default function ProfileActions({ customer, className = '' }: ProfileActionsProps) {
+export default function ProfileActions({ customer, className = '', basePath = '/admin' }: ProfileActionsProps) {
   const router = useRouter();
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -209,7 +210,7 @@ export default function ProfileActions({ customer, className = '' }: ProfileActi
       
       // Redirect to cancelled cylinders section after 1 second
       setTimeout(() => {
-        router.push('/admin?section=cancelled');
+        router.push(`${basePath}?section=cancelled`);
       }, 1000);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to cancel cylinder.');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { requireAdmin } from '../../../../lib/apiAuth';
 
 type UserRole = 'WORKER' | 'ADMIN';
 
@@ -52,6 +53,9 @@ const db = prisma as unknown as {
 
 // Get all users with their permissions
 export async function GET() {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const users = await db.authUser.findMany({
       select: { id: true, username: true, role: true, permissions: true, createdAt: true },
@@ -67,6 +71,9 @@ export async function GET() {
 
 // Update a user's permissions
 export async function PUT(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const userId = typeof body?.userId === 'string' ? body.userId : '';

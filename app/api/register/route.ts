@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { requireAuth } from '../../../lib/apiAuth';
 
 const db = prisma as unknown as {
   auditLog: {
@@ -16,6 +17,9 @@ const db = prisma as unknown as {
 };
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const { name, phone, aadhar, address, gasType, gasVariant, deposit, refund, aadharImageUrl } = body;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import { hashPassword } from '../../../../lib/auth';
+import { requireAdmin } from '../../../../lib/apiAuth';
 
 type UserRole = 'WORKER' | 'ADMIN';
 
@@ -26,6 +27,9 @@ const prismaAuth = prisma as unknown as {
 };
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const username = typeof body?.username === 'string' ? body.username.trim() : '';

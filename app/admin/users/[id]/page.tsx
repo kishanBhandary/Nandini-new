@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '../../../../lib/prisma';
 import ProfileActions from './profile-actions';
@@ -42,9 +41,9 @@ export default async function AdminUserProfilePage({ params }: AdminUserProfileP
     <main className="admin-profile-page-shell">
       <div className="admin-profile-page-card">
         <div className="admin-profile-utility-row">
-          <Link href="/admin" className="admin-profile-back-link">
+          <a href="/admin" className="admin-profile-back-link">
             Back to Dashboard
-          </Link>
+          </a>
         </div>
 
         <div className="admin-profile-page-header">

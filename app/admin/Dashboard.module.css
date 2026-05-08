@@ -204,6 +204,29 @@
   cursor: not-allowed;
 }
 
+.logoutBtn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.logoutBtn:hover {
+  background: #FCA5A5;
+  border-color: #F87171;
+}
+
 /* ── Main Content ───────────────────────────────────── */
 .main {
   flex: 1;
@@ -1169,6 +1192,17 @@
 .dark .downloadBtn:hover:not(:disabled) {
   background: #262626;
   border-color: #404040;
+}
+
+.dark .logoutBtn {
+  background: #450a0a;
+  color: #FCA5A5;
+  border-color: #7f1d1d;
+}
+
+.dark .logoutBtn:hover {
+  background: #7f1d1d;
+  border-color: #991B1B;
 }
 
 .dark .main {

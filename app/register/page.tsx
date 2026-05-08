@@ -29,6 +29,8 @@ const gasVariantMap = {
   INDIAN_GAS: [
     { value: 'INDIAN_19_KG', label: '19 kg' },
     { value: 'INDIAN_5_KG', label: '5 kg' },
+    { value: 'INDIAN_17_KG', label: '17 kg' },
+    { value: 'INDIAN_12_KG', label: '12 kg' },
   ],
   BHARATH_GAS: [
     { value: 'BHARATH_19_KG', label: '19 kg' },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
+import { requireAuth } from '../../../../../lib/apiAuth';
 
 const db = prisma as unknown as {
   auditLog: {
@@ -22,6 +23,9 @@ type RouteContext = {
 };
 
 export async function PUT(request: NextRequest, context: RouteContext) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = context.params;
     const body = await request.json();

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { requireAdmin } from '../../../../lib/apiAuth';
 
 type UserRole = 'WORKER' | 'ADMIN';
 
@@ -20,6 +21,9 @@ const prismaAuth = prisma as unknown as {
 };
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const admins = await prismaAuth.authUser.findMany({
       where: { role: 'ADMIN' },

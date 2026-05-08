@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../../lib/prisma';
+import { requireAuth } from '../../../lib/apiAuth';
 
 export async function GET(request: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const url = new URL(request.url);
   const search = url.searchParams.get('search')?.trim();
   const hasTransaction = url.searchParams.get('hasTransaction') === 'true';
