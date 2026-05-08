@@ -730,9 +730,6 @@ export default function AdminDashboardPage() {
       .map(([month, data]) => ({ month, ...data }));
   }, [dateFilteredCustomers, dateFilteredCancelled]);
 
-  const totalDeposits = useMemo(() => dateFilteredActive.reduce((sum, c) => sum + c.deposit, 0), [dateFilteredActive]);
-  const totalRefunds = useMemo(() => dateFilteredCancelled.reduce((sum, c) => sum + c.refundAmount, 0), [dateFilteredCancelled]);
-
   const PIE_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6'];
   const BAR_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#3B82F6'];
 
@@ -825,7 +822,7 @@ export default function AdminDashboardPage() {
     link.download = 'customers-data.csv';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
   };
 
@@ -1089,7 +1086,27 @@ export default function AdminDashboardPage() {
       {/* ── Main Content ─────────────────────────── */}
       <main className={s.main}>
         {status ? <div className={s.statusError}>{status}</div> : null}
-        {loading ? <p className={s.loadingText}>Loading customer data...</p> : null}
+        {loading ? (
+          <div className={s.loadingWrap} role="status" aria-live="polite">
+            <div className={s.profileLoadingCard}>
+              <div className={s.profileLoadingUtility}>
+                <span className={s.profileLoadingUtilityLine} />
+              </div>
+              <div className={s.profileLoadingHeader}>
+                <h3 className={s.profileLoadingTitle}>Loading customer database...</h3>
+                <p className={s.loadingText}>Preparing profile fields and latest activity</p>
+              </div>
+              <div className={s.profileLoadingGrid}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={s.profileLoadingRow}>
+                    <span className={s.profileLoadingLabel} />
+                    <span className={s.profileLoadingValue} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* ── Dashboard Analytics ──────────────────── */}
         {!loading && showDashboardSection ? (
@@ -1127,18 +1144,6 @@ export default function AdminDashboardPage() {
                 <span className={s.statLabel}>Cancelled Cylinders</span>
                 <span className={s.statNumber}>{dateFilteredCancelled.length}</span>
               </div>
-              <div className={s.statCard}>
-                <span className={s.statLabel}>Total Deposits</span>
-                <span className={s.statNumber}>₹{totalDeposits.toLocaleString()}</span>
-              </div>
-              <div className={s.statCard}>
-                <span className={s.statLabel}>Total Refunds</span>
-                <span className={s.statNumber}>₹{totalRefunds.toLocaleString()}</span>
-              </div>
-              <div className={s.statCard}>
-                <span className={s.statLabel}>Net Revenue</span>
-                <span className={s.statNumber}>₹{(totalDeposits - totalRefunds).toLocaleString()}</span>
-              </div>
             </div>
 
             {/* Charts Row */}
@@ -1156,7 +1161,7 @@ export default function AdminDashboardPage() {
                       <Tooltip
                         contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: darkMode ? '#0A0A0A' : '#fff', color: darkMode ? '#F9FAFB' : '#111' }}
                       />
-                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]} isAnimationActive={false}>
                         {gasTypeData.map((_, i) => (
                           <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
                         ))}
@@ -1185,6 +1190,7 @@ export default function AdminDashboardPage() {
                         label={({ name, percent }) => `${(name ?? '').split(' ').slice(0, 2).join(' ')} ${((percent ?? 0) * 100).toFixed(0)}%`}
                         labelLine={false}
                         style={{ fontSize: 11 }}
+                        isAnimationActive={false}
                       >
                         {gasVariantData.map((_, i) => (
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -1228,8 +1234,8 @@ export default function AdminDashboardPage() {
                       <Tooltip
                         contentStyle={{ borderRadius: 10, border: '1px solid #E5E7EB', fontSize: 13, background: darkMode ? '#0A0A0A' : '#fff', color: darkMode ? '#F9FAFB' : '#111' }}
                       />
-                      <Area type="monotone" dataKey="registrations" stroke="#3B82F6" strokeWidth={2.5} fill="url(#regGrad)" />
-                      <Area type="monotone" dataKey="cancellations" stroke="#EF4444" strokeWidth={2.5} fill="url(#cancelGrad)" />
+                      <Area type="monotone" dataKey="registrations" stroke="#3B82F6" strokeWidth={2.5} fill="url(#regGrad)" isAnimationActive={false} />
+                      <Area type="monotone" dataKey="cancellations" stroke="#EF4444" strokeWidth={2.5} fill="url(#cancelGrad)" isAnimationActive={false} />
                       <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
                     </AreaChart>
                   </ResponsiveContainer>
