@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { prisma } from '../../../../lib/prisma';
+import { getValidSession } from '../../../../lib/apiAuth';
 import ProfileActions from '../../../admin/users/[id]/profile-actions';
 
 type WorkerUserProfilePageProps = {
@@ -9,6 +10,11 @@ type WorkerUserProfilePageProps = {
 };
 
 export default async function WorkerUserProfilePage({ params }: WorkerUserProfilePageProps) {
+  const session = await getValidSession();
+  if (!session || session.role !== 'WORKER') {
+    redirect('/worker/login');
+  }
+
   const customer = await prisma.customer.findUnique({
     where: { id: params.id },
     select: {

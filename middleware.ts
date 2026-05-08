@@ -12,9 +12,13 @@ export function middleware(request: NextRequest) {
   const sessionId = request.cookies.get('session_id')?.value;
   const isLoggedIn = (sessionRole === 'ADMIN' || sessionRole === 'WORKER') && !!sessionId;
 
-  // Allow any logged-in user to view user profiles
-  if ((pathname.startsWith('/admin/users/') || pathname.startsWith('/worker/users/')) && isLoggedIn) {
-    return NextResponse.next();
+  if (!isLoggedIn) {
+    if (pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+    if (pathname.startsWith('/worker')) {
+      return NextResponse.redirect(new URL('/worker/login', request.url));
+    }
   }
 
   if (pathname.startsWith('/admin')) {
