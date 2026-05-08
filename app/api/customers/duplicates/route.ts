@@ -7,31 +7,60 @@ export async function GET() {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    // Find duplicate Aadhar numbers
-    const aadharDuplicates = await prisma.$queryRaw<Array<{ aadhar: string; count: bigint }>>`
-      SELECT aadhar, COUNT(*) as count
-      FROM "Customer"
-      GROUP BY aadhar
-      HAVING COUNT(*) > 1
-      ORDER BY count DESC
-    `;
+    // Get cancelled customer IDs to exclude them
+    const cancelledRecords = await prisma.cancelledCylinder.findMany({
+      select: { customerId: true },
+    });
+    const cancelledIds = cancelledRecords
+      .map(r => r.customerId)
+      .filter((id): id is string => id !== null);
 
-    // Find duplicate phone numbers
-    const phoneDuplicates = await prisma.$queryRaw<Array<{ phone: string; count: bigint }>>`
-      SELECT phone, COUNT(*) as count
-      FROM "Customer"
-      GROUP BY phone
-      HAVING COUNT(*) > 1
-      ORDER BY count DESC
-    `;
+    // Find duplicate Aadhar numbers (only active customers)
+    const aadharDuplicates = cancelledIds.length > 0
+      ? await prisma.$queryRaw<Array<{ aadhar: string; count: bigint }>>`
+          SELECT aadhar, COUNT(*) as count
+          FROM "Customer"
+          WHERE id NOT IN (SELECT unnest(${cancelledIds}::text[]))
+          GROUP BY aadhar
+          HAVING COUNT(*) > 1
+          ORDER BY count DESC
+        `
+      : await prisma.$queryRaw<Array<{ aadhar: string; count: bigint }>>`
+          SELECT aadhar, COUNT(*) as count
+          FROM "Customer"
+          GROUP BY aadhar
+          HAVING COUNT(*) > 1
+          ORDER BY count DESC
+        `;
 
-    // Get full customer details for duplicates
+    // Find duplicate phone numbers (only active customers)
+    const phoneDuplicates = cancelledIds.length > 0
+      ? await prisma.$queryRaw<Array<{ phone: string; count: bigint }>>`
+          SELECT phone, COUNT(*) as count
+          FROM "Customer"
+          WHERE id NOT IN (SELECT unnest(${cancelledIds}::text[]))
+          GROUP BY phone
+          HAVING COUNT(*) > 1
+          ORDER BY count DESC
+        `
+      : await prisma.$queryRaw<Array<{ phone: string; count: bigint }>>`
+          SELECT phone, COUNT(*) as count
+          FROM "Customer"
+          GROUP BY phone
+          HAVING COUNT(*) > 1
+          ORDER BY count DESC
+        `;
+
+    // Get full customer details for duplicates (exclude cancelled)
     const duplicateAadhars = aadharDuplicates.map(d => d.aadhar);
     const duplicatePhones = phoneDuplicates.map(d => d.phone);
 
     const aadharCustomers = duplicateAadhars.length > 0
       ? await prisma.customer.findMany({
-          where: { aadhar: { in: duplicateAadhars } },
+          where: {
+            aadhar: { in: duplicateAadhars },
+            ...(cancelledIds.length > 0 ? { id: { notIn: cancelledIds } } : {}),
+          },
           orderBy: [{ aadhar: 'asc' }, { createdAt: 'desc' }],
           select: { id: true, name: true, phone: true, aadhar: true, address: true, gasType: true, createdAt: true },
         })
@@ -39,7 +68,10 @@ export async function GET() {
 
     const phoneCustomers = duplicatePhones.length > 0
       ? await prisma.customer.findMany({
-          where: { phone: { in: duplicatePhones } },
+          where: {
+            phone: { in: duplicatePhones },
+            ...(cancelledIds.length > 0 ? { id: { notIn: cancelledIds } } : {}),
+          },
           orderBy: [{ phone: 'asc' }, { createdAt: 'desc' }],
           select: { id: true, name: true, phone: true, aadhar: true, address: true, gasType: true, createdAt: true },
         })
