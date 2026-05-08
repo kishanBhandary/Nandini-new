@@ -22,6 +22,7 @@ const db = prisma as unknown as {
       createdAt: Date;
     }>>;
     count: (args?: { where?: Record<string, unknown> }) => Promise<number>;
+    deleteMany: (args: { where: Record<string, unknown> }) => Promise<{ count: number }>;
   };
 };
 
@@ -30,6 +31,16 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
+    // Cleanup: Delete audit logs older than 48 hours
+    const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48 hours ago
+    await db.auditLog.deleteMany({
+      where: {
+        createdAt: {
+          lt: cutoffTime,
+        },
+      },
+    });
+
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
