@@ -23,6 +23,11 @@ function isValidPermission(value: unknown): value is ValidPermission {
   return typeof value === 'string' && VALID_PERMISSIONS.includes(value as ValidPermission);
 }
 
+function normalizePermissions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
 const db = prisma as unknown as {
   authUser: {
     findMany: (args: {
@@ -32,12 +37,12 @@ const db = prisma as unknown as {
       id: string;
       username: string;
       role: UserRole;
-      permissions: string[];
+      permissions: unknown;
       createdAt: Date;
     }>>;
     findUnique: (args: {
       where: { id: string };
-    }) => Promise<{ id: string; username: string; role: UserRole; permissions: string[] } | null>;
+    }) => Promise<{ id: string; username: string; role: UserRole; permissions: unknown } | null>;
     update: (args: {
       where: { id: string };
       data: { permissions: string[] };
@@ -68,7 +73,12 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ users, validPermissions: VALID_PERMISSIONS });
+    const normalizedUsers = users.map((user) => ({
+      ...user,
+      permissions: normalizePermissions(user.permissions),
+    }));
+
+    return NextResponse.json({ users: normalizedUsers, validPermissions: VALID_PERMISSIONS });
   } catch (error) {
     console.error('Permissions list error:', error);
     if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === 'P1001') {
@@ -114,7 +124,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
 
-    const oldPermissions = user.permissions || [];
+    const oldPermissions = normalizePermissions(user.permissions);
 
     await db.authUser.update({
       where: { id: userId },
