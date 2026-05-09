@@ -87,9 +87,18 @@ export default function WorkerDashboardPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch('/api/customers?hasTransaction=true').then(r => parseApiPayload(r)),
-      fetch('/api/cancelled-cylinders').then(r => parseApiPayload(r)),
-    ]).then(([custData, cancelData]) => {
+      fetch('/api/customers').then(async (r) => ({ response: r, data: await parseApiPayload(r) })),
+      fetch('/api/cancelled-cylinders').then(async (r) => ({ response: r, data: await parseApiPayload(r) })),
+    ]).then(([custRes, cancelRes]) => {
+      if (!custRes.response.ok) {
+        throw new Error(getApiError(custRes.data, 'Failed to load customers.'));
+      }
+      if (!cancelRes.response.ok) {
+        throw new Error(getApiError(cancelRes.data, 'Failed to load cancelled cylinders.'));
+      }
+
+      const custData = custRes.data;
+      const cancelData = cancelRes.data;
       setCustomers(Array.isArray(custData.customers) ? (custData.customers as Customer[]) : []);
       setCancelledCylinders(Array.isArray(cancelData.cancelledCylinders) ? (cancelData.cancelledCylinders as CancelledCylinder[]) : []);
     }).catch((error) => {
@@ -117,7 +126,7 @@ export default function WorkerDashboardPage() {
     setLoading(true);
     setStatus(null);
     try {
-      const url = `/api/customers?hasTransaction=true${search.trim() ? `&search=${encodeURIComponent(search.trim())}` : ''}`;
+      const url = `/api/customers${search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''}`;
       const response = await fetch(url);
       const data = await parseApiPayload(response);
       if (!response.ok) {
@@ -202,7 +211,7 @@ export default function WorkerDashboardPage() {
       }
       closeCancelModal();
       const [custRes, cancelRes] = await Promise.all([
-        fetch(`/api/customers?hasTransaction=true&_t=${Date.now()}`, { cache: 'no-store' }).then(r => parseApiPayload(r)),
+        fetch(`/api/customers?_t=${Date.now()}`, { cache: 'no-store' }).then(r => parseApiPayload(r)),
         fetch(`/api/cancelled-cylinders?_t=${Date.now()}`, { cache: 'no-store' }).then(r => parseApiPayload(r)),
       ]);
       setCustomers(Array.isArray(custRes.customers) ? (custRes.customers as Customer[]) : []);
@@ -335,7 +344,7 @@ export default function WorkerDashboardPage() {
             <svg className={s.navIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            Install App
+            Install Appsss
           </button>
         ) : null}
 

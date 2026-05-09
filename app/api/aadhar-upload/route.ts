@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { aadharBucketName, getSupabaseAdmin } from '../../../lib/supabaseAdmin';
-import { requireAuth } from '../../../lib/apiAuth';
+import { requirePermission } from '../../../lib/apiAuth';
 
 async function ensureBucketExists() {
   const supabaseAdmin = getSupabaseAdmin();
@@ -28,7 +28,7 @@ async function ensureBucketExists() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuth();
+  const auth = await requirePermission('create_customers');
   if (auth instanceof NextResponse) return auth;
 
   try {

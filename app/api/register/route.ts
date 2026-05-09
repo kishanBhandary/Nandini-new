@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
-import { requireAuth } from '../../../lib/apiAuth';
+import { requirePermission } from '../../../lib/apiAuth';
 
 const db = prisma as unknown as {
   auditLog: {
@@ -17,7 +17,7 @@ const db = prisma as unknown as {
 };
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth();
+  const auth = await requirePermission('create_customers');
   if (auth instanceof NextResponse) return auth;
 
   try {

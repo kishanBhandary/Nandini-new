@@ -65,6 +65,9 @@ export async function GET() {
     return NextResponse.json({ users, validPermissions: VALID_PERMISSIONS });
   } catch (error) {
     console.error('Permissions list error:', error);
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === 'P1001') {
+      return NextResponse.json({ error: 'Database connection failed. Please check your Supabase connection and try again.' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Failed to fetch users.' }, { status: 500 });
   }
 }
@@ -88,6 +91,20 @@ export async function PUT(request: NextRequest) {
       VALID_PERMISSIONS.includes(p as typeof VALID_PERMISSIONS[number])
     );
 
+    // Permission dependencies:
+    // Any operation/view capability that acts on customer records also needs read access.
+    const normalizedPerms = new Set(validPerms);
+    if (
+      normalizedPerms.has('edit_customers') ||
+      normalizedPerms.has('cancel_cylinders') ||
+      normalizedPerms.has('create_customers') ||
+      normalizedPerms.has('view_dashboard') ||
+      normalizedPerms.has('view_duplicates')
+    ) {
+      normalizedPerms.add('read_customers');
+    }
+    const effectivePerms = Array.from(normalizedPerms);
+
     const user = await db.authUser.findUnique({ where: { id: userId } });
     if (!user) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
@@ -97,12 +114,12 @@ export async function PUT(request: NextRequest) {
 
     await db.authUser.update({
       where: { id: userId },
-      data: { permissions: validPerms },
+      data: { permissions: effectivePerms },
     });
 
     // Log permission change
-    const adminUsername = request.cookies.get('session_username')?.value || 'unknown';
-    const adminRole = request.cookies.get('session_role')?.value || 'ADMIN';
+    const adminUsername = auth.username;
+    const adminRole = auth.role;
 
     await db.auditLog.create({
       data: {
@@ -113,7 +130,7 @@ export async function PUT(request: NextRequest) {
         details: JSON.stringify({
           targetRole: user.role,
           from: oldPermissions,
-          to: validPerms,
+          to: effectivePerms,
         }),
       },
     });
@@ -124,6 +141,9 @@ export async function PUT(request: NextRequest) {
     });
   } catch (error) {
     console.error('Update permissions error:', error);
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === 'P1001') {
+      return NextResponse.json({ error: 'Database connection failed. Please check your Supabase connection and try again.' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Failed to update permissions.' }, { status: 500 });
   }
 }

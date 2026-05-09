@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
-import { requireAuth } from '../../../../../lib/apiAuth';
+import { requirePermission } from '../../../../../lib/apiAuth';
 
 type RouteContext = {
   params: {
@@ -10,7 +10,7 @@ type RouteContext = {
 
 // GET - Fetch refill history for a customer
 export async function GET(_request: NextRequest, context: RouteContext) {
-  const auth = await requireAuth();
+  const auth = await requirePermission('read_customers');
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
 // POST - Add a new refill
 export async function POST(request: NextRequest, context: RouteContext) {
-  const auth = await requireAuth();
+  const auth = await requirePermission('edit_customers');
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -67,6 +67,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
 // PATCH - Toggle cylinder returned status for a refill
 export async function PATCH(request: NextRequest, context: RouteContext) {
+  const auth = await requirePermission('edit_customers');
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const { refillId, cylinderReturned } = body;

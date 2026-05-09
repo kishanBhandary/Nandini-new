@@ -7,6 +7,7 @@ type SessionInfo = {
   userId: string;
   username: string;
   role: 'ADMIN' | 'WORKER';
+  permissions: string[];
 };
 
 const prismaSession = prisma as unknown as {
@@ -14,6 +15,12 @@ const prismaSession = prisma as unknown as {
     findUnique: (args: {
       where: { id: string };
     }) => Promise<{ id: string; userId: string; role: string; active: boolean; expiresAt: Date } | null>;
+  };
+  authUser: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { username: true; role: true; permissions: true };
+    }) => Promise<{ username: string; role: 'ADMIN' | 'WORKER'; permissions: string[] } | null>;
   };
 };
 
@@ -25,9 +32,8 @@ export async function getValidSession(): Promise<SessionInfo | null> {
   const cookieStore = cookies();
   const sessionId = cookieStore.get('session_id')?.value;
   const sessionRole = cookieStore.get('session_role')?.value;
-  const sessionUsername = cookieStore.get('session_username')?.value;
 
-  if (!sessionId || !sessionRole || !sessionUsername) {
+  if (!sessionId || !sessionRole) {
     return null;
   }
 
@@ -44,11 +50,21 @@ export async function getValidSession(): Promise<SessionInfo | null> {
       return null;
     }
 
+    const user = await prismaSession.authUser.findUnique({
+      where: { id: session.userId },
+      select: { username: true, role: true, permissions: true },
+    });
+
+    if (!user || user.role !== session.role) {
+      return null;
+    }
+
     return {
       sessionId: session.id,
       userId: session.userId,
-      username: decodeURIComponent(sessionUsername),
+      username: user.username,
       role: session.role as 'ADMIN' | 'WORKER',
+      permissions: Array.isArray(user.permissions) ? user.permissions : [],
     };
   } catch {
     return null;
@@ -85,6 +101,17 @@ export async function requireRole(role: 'ADMIN' | 'WORKER'): Promise<SessionInfo
   const session = await getValidSession();
   if (!session) return unauthorizedResponse();
   if (session.role !== role) return forbiddenResponse();
+  return session;
+}
+
+/**
+ * Require a specific permission. ADMIN always has access.
+ */
+export async function requirePermission(permission: string): Promise<SessionInfo | NextResponse> {
+  const session = await getValidSession();
+  if (!session) return unauthorizedResponse();
+  if (session.role === 'ADMIN') return session;
+  if (!session.permissions.includes(permission)) return forbiddenResponse();
   return session;
 }
 

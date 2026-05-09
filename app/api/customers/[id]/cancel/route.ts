@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
-import { requireAuth } from '../../../../../lib/apiAuth';
+import { requirePermission } from '../../../../../lib/apiAuth';
 
 const db = prisma as unknown as {
   auditLog: {
@@ -23,7 +23,7 @@ type RouteContext = {
 };
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  const auth = await requireAuth();
+  const auth = await requirePermission('cancel_cylinders');
   if (auth instanceof NextResponse) return auth;
 
   try {

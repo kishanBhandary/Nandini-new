@@ -426,9 +426,16 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch('/api/admin/permissions');
       const data = await parseApiPayload(res);
+      if (!res.ok) {
+        throw new Error(getApiError(data, 'Failed to fetch permissions.'));
+      }
       setPermUsers(Array.isArray(data.users) ? (data.users as PermUser[]) : []);
       if (Array.isArray(data.validPermissions)) setValidPermissions(data.validPermissions as string[]);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to fetch permissions.';
+      setPermMessage(`Error: ${message}`);
+      console.error(e);
+    }
     finally { setPermLoading(false); }
   }, []);
 
@@ -1862,6 +1869,9 @@ export default function AdminDashboardPage() {
                 <div>
                   <h2 className={s.createTitle}>Role-based Permissions</h2>
                   <p className={s.createSub}>Assign granular permissions to admins and workers</p>
+                  <p className={s.createSub} style={{ marginTop: '0.25rem' }}>
+                    Note: read customers is auto-enabled when assigning dashboard, duplicate, create, edit, or cancel permissions.
+                  </p>
                 </div>
                 <button
                   type="button"

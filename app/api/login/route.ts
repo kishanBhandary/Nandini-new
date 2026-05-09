@@ -4,6 +4,13 @@ import { hashPassword, verifyPassword } from '../../../lib/auth';
 
 type UserRole = 'WORKER' | 'ADMIN';
 
+const DEFAULT_WORKER_PERMISSIONS = [
+  'read_customers',
+  'create_customers',
+  'edit_customers',
+  'cancel_cylinders',
+] as const;
+
 const prismaAuth = prisma as unknown as {
   authUser: {
     upsert: (args: {
@@ -14,6 +21,10 @@ const prismaAuth = prisma as unknown as {
     findUnique: (args: {
       where: { username_role: { username: string; role: UserRole } };
     }) => Promise<{ id: string; role: UserRole; passwordHash: string; permissions: string[] } | null>;
+    update: (args: {
+      where: { id: string };
+      data: { permissions: string[] };
+    }) => Promise<unknown>;
   };
   session: {
     create: (args: {
@@ -101,6 +112,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
     }
 
+    let effectivePermissions = Array.isArray(user.permissions) ? user.permissions : [];
+    if (user.role === 'WORKER' && effectivePermissions.length === 0) {
+      effectivePermissions = [...DEFAULT_WORKER_PERMISSIONS];
+      await prismaAuth.authUser.update({
+        where: { id: user.id },
+        data: { permissions: effectivePermissions },
+      });
+    }
+
     // Get IP & user agent
     const forwarded = request.headers.get('x-forwarded-for');
     const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || undefined;
@@ -129,7 +149,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const response = NextResponse.json({ success: true, role: user.role, permissions: user.permissions || [] });
+    const response = NextResponse.json({ success: true, role: user.role, permissions: effectivePermissions });
 
     const cookieOpts = {
       httpOnly: true,
@@ -142,7 +162,7 @@ export async function POST(request: Request) {
     response.cookies.set('session_role', user.role, cookieOpts);
     response.cookies.set('session_id', session.id, cookieOpts);
     response.cookies.set('session_username', username, cookieOpts);
-    response.cookies.set('session_permissions', JSON.stringify(user.permissions || []), cookieOpts);
+    response.cookies.set('session_permissions', JSON.stringify(effectivePermissions), cookieOpts);
 
     return response;
   } catch (error) {

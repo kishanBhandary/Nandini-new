@@ -5,13 +5,20 @@ import { requireAdmin } from '../../../../lib/apiAuth';
 
 type UserRole = 'WORKER' | 'ADMIN';
 
+const DEFAULT_WORKER_PERMISSIONS = [
+  'read_customers',
+  'create_customers',
+  'edit_customers',
+  'cancel_cylinders',
+] as const;
+
 const prismaAuth = prisma as unknown as {
   authUser: {
     findUnique: (args: {
       where: { username_role: { username: string; role: UserRole } };
     }) => Promise<{ role: UserRole; passwordHash: string } | null>;
     create: (args: {
-      data: { username: string; role: UserRole; passwordHash: string };
+      data: { username: string; role: UserRole; passwordHash: string; permissions: string[] };
     }) => Promise<unknown>;
   };
   auditLog: {
@@ -59,7 +66,12 @@ export async function POST(request: NextRequest) {
     }
 
     await prismaAuth.authUser.create({
-      data: { username, role: 'WORKER', passwordHash: await hashPassword(password) },
+      data: {
+        username,
+        role: 'WORKER',
+        passwordHash: await hashPassword(password),
+        permissions: [...DEFAULT_WORKER_PERMISSIONS],
+      },
     });
 
     // Audit log

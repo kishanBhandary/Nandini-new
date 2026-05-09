@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
-import { requireAuth } from '../../../lib/apiAuth';
+import { requirePermission } from '../../../lib/apiAuth';
 
 export async function GET() {
-  const auth = await requireAuth();
+  const auth = await requirePermission('read_customers');
   if (auth instanceof NextResponse) return auth;
 
   try {
