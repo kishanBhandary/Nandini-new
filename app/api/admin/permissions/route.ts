@@ -17,6 +17,12 @@ const VALID_PERMISSIONS = [
   'view_duplicates',
 ] as const;
 
+type ValidPermission = (typeof VALID_PERMISSIONS)[number];
+
+function isValidPermission(value: unknown): value is ValidPermission {
+  return typeof value === 'string' && VALID_PERMISSIONS.includes(value as ValidPermission);
+}
+
 const db = prisma as unknown as {
   authUser: {
     findMany: (args: {
@@ -80,20 +86,18 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const userId = typeof body?.userId === 'string' ? body.userId : '';
-    const permissions = Array.isArray(body?.permissions) ? body.permissions : [];
+    const permissions: unknown[] = Array.isArray(body?.permissions) ? body.permissions : [];
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
     }
 
     // Validate permissions
-    const validPerms = permissions.filter((p: string) =>
-      VALID_PERMISSIONS.includes(p as typeof VALID_PERMISSIONS[number])
-    );
+    const validPerms = permissions.filter(isValidPermission);
 
     // Permission dependencies:
     // Any operation/view capability that acts on customer records also needs read access.
-    const normalizedPerms = new Set(validPerms);
+    const normalizedPerms = new Set<ValidPermission>(validPerms);
     if (
       normalizedPerms.has('edit_customers') ||
       normalizedPerms.has('cancel_cylinders') ||
@@ -103,7 +107,7 @@ export async function PUT(request: NextRequest) {
     ) {
       normalizedPerms.add('read_customers');
     }
-    const effectivePerms = Array.from(normalizedPerms);
+    const effectivePerms: string[] = Array.from(normalizedPerms);
 
     const user = await db.authUser.findUnique({ where: { id: userId } });
     if (!user) {
