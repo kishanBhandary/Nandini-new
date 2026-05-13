@@ -2,6 +2,25 @@ import { notFound } from 'next/navigation';
 import { prisma } from '../../../../lib/prisma';
 import ProfileActions from './profile-actions';
 
+function parseAadharImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
 type AdminUserProfilePageProps = {
   params: {
     id: string;
@@ -36,6 +55,8 @@ export default async function AdminUserProfilePage({ params }: AdminUserProfileP
   if (!customer) {
     notFound();
   }
+
+  const aadharImages = parseAadharImageUrls(customer.aadharImageUrl);
 
   return (
     <main className="admin-profile-page-shell">
@@ -90,17 +111,21 @@ export default async function AdminUserProfilePage({ params }: AdminUserProfileP
           <div>
             <dt>Aadhar Image</dt>
             <dd>
-              {customer.aadharImageUrl ? (
+              {aadharImages.length > 0 ? (
                 <div className="aadhar-image-preview">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={customer.aadharImageUrl}
-                    alt={`Aadhar of ${customer.name}`}
-                    className="aadhar-inline-img"
-                  />
-                  <a href={customer.aadharImageUrl} target="_blank" rel="noreferrer" className="aadhar-open-link">
-                    Open full size
-                  </a>
+                  {aadharImages.map((url, index) => (
+                    <div key={url}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Aadhar ${index + 1} of ${customer.name}`}
+                        className="aadhar-inline-img"
+                      />
+                      <a href={url} target="_blank" rel="noreferrer" className="aadhar-open-link">
+                        Open full size ({index + 1})
+                      </a>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 'No image'

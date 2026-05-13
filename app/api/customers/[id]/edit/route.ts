@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { requirePermission } from '../../../../../lib/apiAuth';
+import { aadharBucketName, getSupabaseAdmin } from '../../../../../lib/supabaseAdmin';
 
 const db = prisma as unknown as {
   auditLog: {
@@ -22,6 +23,45 @@ type RouteContext = {
   };
 };
 
+function parseAadharImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
+function encodeAadharImageUrls(urls: string[]): string | null {
+  const normalized = urls.filter((url) => typeof url === 'string' && url.trim().length > 0).slice(0, 3);
+  if (normalized.length === 0) return null;
+  if (normalized.length === 1) return normalized[0];
+  return JSON.stringify(normalized);
+}
+
+function getStoragePathFromPublicUrl(publicUrl: string): string | null {
+  try {
+    const parsed = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${aadharBucketName}/`;
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+    const encodedPath = parsed.pathname.slice(markerIndex + marker.length);
+    return decodeURIComponent(encodedPath);
+  } catch {
+    return null;
+  }
+}
+
 export async function PUT(request: NextRequest, context: RouteContext) {
   const auth = await requirePermission('edit_customers');
   if (auth instanceof NextResponse) return auth;
@@ -29,7 +69,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   try {
     const { id } = context.params;
     const body = await request.json();
-    const { name, phone, aadhar, address, gasType, gasVariant, deposit, refund, performedBy } = body;
+    const { name, phone, aadhar, address, gasType, gasVariant, deposit, refund, performedBy, aadharImages } = body;
 
     const customer = await prisma.customer.findUnique({ where: { id } });
     if (!customer) {
@@ -79,9 +119,27 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       }
     }
 
+    if (aadharImages !== undefined) {
+      const nextImages = Array.isArray(aadharImages)
+        ? aadharImages.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3)
+        : [];
+      const prevImages = parseAadharImageUrls(customer.aadharImageUrl);
+
+      const areSame =
+        prevImages.length === nextImages.length &&
+        prevImages.every((url, index) => url === nextImages[index]);
+
+      if (!areSame) {
+        changes.aadharImages = { from: prevImages, to: nextImages };
+        updateData.aadharImageUrl = encodeAadharImageUrls(nextImages);
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No changes detected.' }, { status: 400 });
     }
+
+    const previousAadharImages = parseAadharImageUrls(customer.aadharImageUrl);
 
     const result = await prisma.$transaction(async (tx) => {
       const updated = await tx.customer.update({
@@ -100,6 +158,25 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
       return updated;
     });
+
+    // Remove old files that were replaced/removed in edit mode.
+    const nextAadharImages = parseAadharImageUrls(result.aadharImageUrl);
+    const removedPublicUrls = previousAadharImages.filter((url) => !nextAadharImages.includes(url));
+    if (removedPublicUrls.length > 0) {
+      const supabaseAdmin = getSupabaseAdmin();
+      if (supabaseAdmin) {
+        const pathsToDelete = removedPublicUrls
+          .map((url) => getStoragePathFromPublicUrl(url))
+          .filter((path): path is string => Boolean(path));
+
+        if (pathsToDelete.length > 0) {
+          const { error } = await supabaseAdmin.storage.from(aadharBucketName).remove(pathsToDelete);
+          if (error) {
+            console.error('Aadhar cleanup warning:', error.message);
+          }
+        }
+      }
+    }
 
     // Audit log
     const username = request.cookies.get('session_username')?.value || performedBy || 'unknown';

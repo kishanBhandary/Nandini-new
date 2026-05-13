@@ -23,6 +23,25 @@ type ProfileActionsProps = {
   basePath?: string;
 };
 
+function parseAadharImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
 function DownloadIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -65,6 +84,7 @@ async function buildProfilePdf(customer: CustomerProfileData) {
   const doc = new jsPDF();
   const left = 16;
   let y = 18;
+  const aadharImages = parseAadharImageUrls(customer.aadharImageUrl);
 
   doc.setFontSize(18);
   doc.text('Nandini Enterprises - User Profile', left, y);
@@ -82,7 +102,7 @@ async function buildProfilePdf(customer: CustomerProfileData) {
     ['Deposit', `Rs. ${customer.deposit}`],
     ['Refund', `Rs. ${customer.refund}`],
     ['Cancelled Cylinder', customer.refund > 0 ? 'Yes' : 'No'],
-    ['Aadhar Image', customer.aadharImageUrl ?? 'No image'],
+    ['Aadhar Images', aadharImages.length > 0 ? aadharImages.join(', ') : 'No image'],
     ['Registered At', new Date(customer.createdAt).toLocaleString()],
   ];
 

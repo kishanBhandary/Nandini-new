@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { aadharBucketName, getSupabaseAdmin } from '../../../lib/supabaseAdmin';
-import { requirePermission } from '../../../lib/apiAuth';
+import { forbiddenResponse, getValidSession, unauthorizedResponse } from '../../../lib/apiAuth';
 
 async function ensureBucketExists() {
   const supabaseAdmin = getSupabaseAdmin();
@@ -28,8 +28,17 @@ async function ensureBucketExists() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requirePermission('create_customers');
-  if (auth instanceof NextResponse) return auth;
+  const session = await getValidSession();
+  if (!session) return unauthorizedResponse();
+
+  const canUpload =
+    session.role === 'ADMIN' ||
+    session.permissions.includes('create_customers') ||
+    session.permissions.includes('edit_customers');
+
+  if (!canUpload) {
+    return forbiddenResponse();
+  }
 
   try {
     const supabaseAdmin = getSupabaseAdmin();

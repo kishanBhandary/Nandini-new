@@ -3,6 +3,25 @@ import { prisma } from '../../../../lib/prisma';
 import { getValidSession } from '../../../../lib/apiAuth';
 import ProfileActions from '../../../admin/users/[id]/profile-actions';
 
+function parseAadharImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
 type WorkerUserProfilePageProps = {
   params: {
     id: string;
@@ -35,6 +54,8 @@ export default async function WorkerUserProfilePage({ params }: WorkerUserProfil
   if (!customer) {
     notFound();
   }
+
+  const aadharImages = parseAadharImageUrls(customer.aadharImageUrl);
 
   return (
     <main className="admin-profile-page-shell">
@@ -85,10 +106,14 @@ export default async function WorkerUserProfilePage({ params }: WorkerUserProfil
           <div>
             <dt>Aadhar Image</dt>
             <dd>
-              {customer.aadharImageUrl ? (
-                <a href={customer.aadharImageUrl} target="_blank" rel="noreferrer">
-                  Open image
-                </a>
+              {aadharImages.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {aadharImages.map((url, index) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      Open image {index + 1}
+                    </a>
+                  ))}
+                </div>
               ) : (
                 'No image'
               )}

@@ -131,6 +131,31 @@ type PermUser = {
   createdAt: string;
 };
 
+type AadharModalState = {
+  name: string;
+  urls: string[];
+  index: number;
+};
+
+function parseAadharImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [trimmed];
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -175,13 +200,16 @@ export default function AdminDashboardPage() {
   const [duplicatesLoading, setDuplicatesLoading] = useState(false);
 
   // Aadhar image modal
-  const [aadharModal, setAadharModal] = useState<{ name: string; url: string } | null>(null);
+  const [aadharModal, setAadharModal] = useState<AadharModalState | null>(null);
 
   // Edit customer modal
   const [editModal, setEditModal] = useState<Customer | null>(null);
   const [editForm, setEditForm] = useState<Partial<Customer>>({});
   const [editLoading, setEditLoading] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [editAadharUrls, setEditAadharUrls] = useState<Array<string | null>>([null, null, null]);
+  const [editAadharFiles, setEditAadharFiles] = useState<Array<File | null>>([null, null, null]);
+  const [editAadharPreviews, setEditAadharPreviews] = useState<Array<string | null>>([null, null, null]);
 
   // Audit log
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -814,7 +842,7 @@ export default function AdminDashboardPage() {
       customer.gasVariant,
       customer.deposit.toString(),
       customer.refund.toString(),
-      customer.aadharImageUrl ?? '',
+      parseAadharImageUrls(customer.aadharImageUrl).join(' | '),
       new Date(customer.createdAt).toISOString(),
     ]);
 
@@ -841,6 +869,7 @@ export default function AdminDashboardPage() {
 
   // ── Edit customer ──
   const openEditModal = (customer: Customer) => {
+    const parsedUrls = parseAadharImageUrls(customer.aadharImageUrl);
     setEditModal(customer);
     setEditForm({
       name: customer.name,
@@ -852,6 +881,13 @@ export default function AdminDashboardPage() {
       deposit: customer.deposit,
       refund: customer.refund,
     });
+    setEditAadharUrls([
+      parsedUrls[0] ?? null,
+      parsedUrls[1] ?? null,
+      parsedUrls[2] ?? null,
+    ]);
+    setEditAadharFiles([null, null, null]);
+    setEditAadharPreviews([null, null, null]);
     setEditMessage(null);
   };
 
@@ -859,6 +895,71 @@ export default function AdminDashboardPage() {
     setEditModal(null);
     setEditForm({});
     setEditMessage(null);
+    setEditAadharUrls([null, null, null]);
+    setEditAadharFiles([null, null, null]);
+    setEditAadharPreviews([null, null, null]);
+  };
+
+  const handleEditAadharFileSelect = (slot: number, file: File | null) => {
+    setEditAadharFiles((prev) => {
+      const next = [...prev];
+      next[slot] = file;
+      return next;
+    });
+
+    if (!file) {
+      setEditAadharPreviews((prev) => {
+        const next = [...prev];
+        next[slot] = null;
+        return next;
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditAadharPreviews((prev) => {
+        const next = [...prev];
+        next[slot] = typeof reader.result === 'string' ? reader.result : null;
+        return next;
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeEditAadharSlot = (slot: number) => {
+    setEditAadharUrls((prev) => {
+      const next = [...prev];
+      next[slot] = null;
+      return next;
+    });
+    setEditAadharFiles((prev) => {
+      const next = [...prev];
+      next[slot] = null;
+      return next;
+    });
+    setEditAadharPreviews((prev) => {
+      const next = [...prev];
+      next[slot] = null;
+      return next;
+    });
+  };
+
+  const uploadAadharImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/aadhar-upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await parseApiPayload(response);
+    if (!response.ok) {
+      throw new Error(getApiError(data, 'Failed to upload Aadhar image.'));
+    }
+
+    return typeof data.publicUrl === 'string' ? data.publicUrl : '';
   };
 
   const submitEdit = async () => {
@@ -866,16 +967,34 @@ export default function AdminDashboardPage() {
     setEditLoading(true);
     setEditMessage(null);
     try {
+      const nextAadharUrls = [...editAadharUrls];
+
+      for (let i = 0; i < editAadharFiles.length; i += 1) {
+        const file = editAadharFiles[i];
+        if (!file) continue;
+        const uploadedUrl = await uploadAadharImage(file);
+        nextAadharUrls[i] = uploadedUrl || null;
+      }
+
+      const normalizedAadharUrls = nextAadharUrls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0).slice(0, 3);
+
       const response = await fetch(`/api/customers/${editModal.id}/edit`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editForm, performedBy: 'admin' }),
+        body: JSON.stringify({ ...editForm, aadharImages: normalizedAadharUrls, performedBy: 'admin' }),
       });
       const data = await parseApiPayload(response);
       if (!response.ok) {
         throw new Error(getApiError(data, 'Failed to update customer.'));
       }
       setEditMessage('Success: Customer updated successfully.');
+      setEditAadharUrls([
+        normalizedAadharUrls[0] ?? null,
+        normalizedAadharUrls[1] ?? null,
+        normalizedAadharUrls[2] ?? null,
+      ]);
+      setEditAadharFiles([null, null, null]);
+      setEditAadharPreviews([null, null, null]);
       // Refresh customer list
       fetchCustomers(pagination.page);
       setTimeout(closeEditModal, 1200);
@@ -1304,11 +1423,14 @@ export default function AdminDashboardPage() {
                           <td>{customer.aadhar}</td>
                           <td>{customer.gasType}</td>
                           <td>
-                            {customer.aadharImageUrl ? (
+                            {parseAadharImageUrls(customer.aadharImageUrl).length > 0 ? (
                               <button
                                 type="button"
                                 className={s.imgPreviewBtn}
-                                onClick={() => setAadharModal({ name: customer.name, url: customer.aadharImageUrl! })}
+                                onClick={() => {
+                                  const urls = parseAadharImageUrls(customer.aadharImageUrl);
+                                  setAadharModal({ name: customer.name, urls, index: 0 });
+                                }}
                                 title="View Aadhar"
                               >
                                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2278,12 +2400,47 @@ export default function AdminDashboardPage() {
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={aadharModal.url}
+              src={aadharModal.urls[aadharModal.index]}
               alt={`Aadhar of ${aadharModal.name}`}
               style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }}
             />
+            {aadharModal.urls.length > 1 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
+                <button
+                  type="button"
+                  className={s.modalCancelBtn}
+                  onClick={() => setAadharModal((prev) => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      index: prev.index === 0 ? prev.urls.length - 1 : prev.index - 1,
+                    };
+                  })}
+                  style={{ margin: 0 }}
+                >
+                  Prev
+                </button>
+                <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                  {aadharModal.index + 1} / {aadharModal.urls.length}
+                </span>
+                <button
+                  type="button"
+                  className={s.modalCancelBtn}
+                  onClick={() => setAadharModal((prev) => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      index: prev.index === prev.urls.length - 1 ? 0 : prev.index + 1,
+                    };
+                  })}
+                  style={{ margin: 0 }}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
             <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
-              <a href={aadharModal.url} target="_blank" rel="noreferrer" className={s.viewBtn} style={{ textDecoration: 'none', display: 'inline-block' }}>
+              <a href={aadharModal.urls[aadharModal.index]} target="_blank" rel="noreferrer" className={s.viewBtn} style={{ textDecoration: 'none', display: 'inline-block' }}>
                 Open Full Size
               </a>
             </div>
@@ -2339,6 +2496,45 @@ export default function AdminDashboardPage() {
               <div className={s.modalField}>
                 <label className={s.modalLabel}>Refund (₹)</label>
                 <input className={s.modalInput} type="number" min="0" value={editForm.refund ?? ''} onChange={e => setEditForm(f => ({ ...f, refund: Number(e.target.value) }))} />
+              </div>
+              <div className={s.modalField} style={{ gridColumn: '1 / -1' }}>
+                <label className={s.modalLabel}>Aadhar Photos (up to 3)</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                  {[0, 1, 2].map((slot) => {
+                    const preview = editAadharPreviews[slot] || editAadharUrls[slot];
+                    return (
+                      <div key={slot} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '0.6rem', background: '#F9FAFB' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.45rem' }}>Photo {slot + 1}</div>
+                        {preview ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={preview}
+                            alt={`Aadhar photo ${slot + 1}`}
+                            style={{ width: '100%', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E5E7EB' }}
+                          />
+                        ) : (
+                          <div style={{ width: '100%', height: '88px', borderRadius: '8px', border: '1px dashed #D1D5DB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '0.78rem' }}>
+                            No image
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.72rem' }}
+                          onChange={(event) => handleEditAadharFileSelect(slot, event.target.files?.[0] ?? null)}
+                        />
+                        <button
+                          type="button"
+                          className={s.modalCancelBtn}
+                          style={{ marginTop: '0.4rem', width: '100%', padding: '0.35rem 0.45rem', fontSize: '0.75rem' }}
+                          onClick={() => removeEditAadharSlot(slot)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className={s.modalActions}>
